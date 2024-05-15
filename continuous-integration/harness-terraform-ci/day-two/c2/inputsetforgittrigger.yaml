@@ -1,0 +1,184 @@
+inputSet:
+  name: ${inputset_name}
+  identifier: ${inputset_identifier}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  tags: {}
+  pipeline:
+    identifier: ${pipeline_identifier}
+    stages:
+      - stage:
+          identifier: mybuild
+          type: CI
+          spec:
+            execution:
+              steps:
+                - parallel:
+                    - step:
+                        identifier: docompilecode
+                        type: Run
+                        spec:
+                          command: mvn compile
+                - parallel:
+                    - step:
+                        identifier: dorununittest
+                        type: RunTests
+                        spec:
+                          args: test
+                          reports:
+                            type: JUnit
+                            spec:
+                              paths:
+                                - "**/*.xml"
+                - parallel:
+                    - step:
+                        identifier: dopmdchecks
+                        type: Run
+                        spec:
+                          command: |-
+                            STAGEDIR=/root/myscan/staticcodeanalysis/pmd
+                            DOWNLOADURL=https://github.com/pmd/pmd/releases/download/pmd_releases%2F7.0.0/pmd-dist-7.0.0-bin.zip
+                            FILENAME=pmd.zip
+                            mkdir -p $${STAGEDIR}
+                            [ ! -f "$${STAGEDIR}/$${FILENAME}" ] && curl -s -L -o $${STAGEDIR}/$${FILENAME} $${DOWNLOADURL} && unzip $${STAGEDIR}/$${FILENAME} -d $${STAGEDIR}
+                            $${STAGEDIR}/pmd-bin-7.0.0/bin/pmd check -d /harness/ -R rulesets/java/quickstart.xml -f xml -r pmdreport.xml --no-progress --no-fail-on-violation
+                            cat pmdreport.xml
+                    - step:
+                        identifier: doscansecrets
+                        type: Run
+                        spec:
+                          command: |-
+                            STAGEDIR=/root/myscan/secretleaks/gitleaks
+                            DOWNLOADURL=https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz
+                            FILENAME=gitleaks.tar.gz
+                            mkdir -p $${STAGEDIR}
+                            [ ! -f "$${STAGEDIR}/$${FILENAME}" ] && curl -s -L -o $${STAGEDIR}/$${FILENAME} $${DOWNLOADURL} && tar -xvf $${STAGEDIR}/$${FILENAME} -C $${STAGEDIR}
+                            $${STAGEDIR}/gitleaks detect --source /harness/ --no-banner --verbose --report-format JUNIT --report-path /harness/gitleaksreport.xml
+                            cat /harness/gitleaksreport.xml
+                    - step:
+                        identifier: doscancodevulnerabilities
+                        type: Run
+                        spec:
+                          command: |-
+                            STAGEDIR=/root/myscan/codevulnerabilities/trivy
+                            DOWNLOADURL=https://github.com/aquasecurity/trivy/releases/download/v0.49.1/trivy_0.49.1_Linux-64bit.deb
+                            FILENAME=trivy.deb
+                            mkdir -p $${STAGEDIR}
+                            [ ! -f "$${STAGEDIR}/$${FILENAME}" ] && curl -s -L -o $${STAGEDIR}/$${FILENAME} $${DOWNLOADURL} 
+                            sudo dpkg -i $${STAGEDIR}/$${FILENAME}
+                            curl -s -L -o $${STAGEDIR}/junit.tpl https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/junit.tpl
+                            trivy fs --scanners vuln,secret,misconfig --format template --template "@/root/myscan/codevulnerabilities/trivy/junit.tpl" -o trivyfsreport.xml /harness/
+                - parallel:
+                    - step:
+                        identifier: dobuildpackage
+                        type: Run
+                        spec:
+                          command: mvn -Dmaven.test.skip=true package
+                - parallel:
+                    - step:
+                        identifier: dopublishpackage
+                        type: Run
+                        spec:
+                          command: curl -fsSl -u admin:admin123 --upload-file /harness/target/ums-0.0.1-SNAPSHOT.jar https://nexus.<+variable.mydomain>/repository/maven-releases/com/auto/mybackendservice/0.0.<+pipeline.sequenceId>/mybackendservice-0.0.<+pipeline.sequenceId>.jar
+                - parallel:
+                    - step:
+                        identifier: dobuildcontainerimage
+                        type: Run
+                        spec:
+                          command: |-
+                            docker build -t harbor.<+variable.mydomain>/library/<+pipeline.properties.ci.codebase.repoName>:<+pipeline.sequenceId> .
+                            docker images 
+                - parallel:
+                    - step:
+                        identifier: doruncontainerimagesmoketest
+                        type: Run
+                        spec:
+                          command: |
+                            docker run -d -p 8080:8080 --name=<+pipeline.properties.ci.codebase.repoName> harbor.<+variable.mydomain>/library/<+pipeline.properties.ci.codebase.repoName>:<+pipeline.sequenceId>
+                            docker ps
+                            sleep 30
+                            curl localhost:8080/api/v1/configinfo | jq
+                            docker stop <+pipeline.properties.ci.codebase.repoName>
+                            sleep 5
+                            docker ps
+                            docker rm <+pipeline.properties.ci.codebase.repoName>
+                - parallel:
+                    - step:
+                        identifier: doscancontainerimagevulnerabilities
+                        type: Run
+                        spec:
+                          command: |-
+                            STAGEDIR=/root/myscan/containerimagevulnerabilities/grype
+                            DOWNLOADURL=https://raw.githubusercontent.com/anchore/grype/main/templates/junit.tmpl
+                            FILENAME=junit.tmpl
+                            mkdir -p $${STAGEDIR}
+                            curl -s -L -o $${STAGEDIR}/$${FILENAME} $${DOWNLOADURL}
+                            curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+                            grype harbor.<+variable.mydomain>/library/<+pipeline.properties.ci.codebase.repoName>:<+pipeline.sequenceId> -o template -t $${STAGEDIR}/junit.tmpl > grypereport.xml
+                            ls -ltra
+                            docker rmi harbor.<+variable.mydomain>/library/<+pipeline.properties.ci.codebase.repoName>:<+pipeline.sequenceId>
+                - stepGroup:
+                    identifier: formainbranchonly
+                    steps:
+                      - parallel:
+                          - step:
+                              identifier: dobuildandpushcontainerimage
+                              type: BuildAndPushDockerRegistry
+                              spec:
+                                repo: harbor.<+variable.mydomain>/library/<+pipeline.properties.ci.codebase.repoName>
+                                tags:
+                                  - <+pipeline.sequenceId>
+                      - parallel:
+                          - step:
+                              identifier: dorunintegrationtest
+                              type: Run
+                              spec:
+                                command: |-
+                                  k8sversion=<+<+matrix.k8sversion>.replace(".","_")>
+                                  STAGEDIR=/root/mytest/integrationtesting/kind$${k8sversion}
+                                  mkdir -p $${STAGEDIR} && cd $${STAGEDIR}
+                                  curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.22.0/kind-linux-amd64 && chmod +x kind
+                                  ./kind version
+                                  ./kind create cluster --name cluster<+matrix.k8sversion> --image kindest/node:<+matrix.k8sversion> --kubeconfig cluster$${k8sversion}-kubeconfig
+                                  kubectl version --kubeconfig cluster$${k8sversion}-kubeconfig
+                                  kubectl cluster-info --kubeconfig cluster$${k8sversion}-kubeconfig
+                                  kubectl create deployment <+pipeline.properties.ci.codebase.repoName> --image=harbor.<+variable.mydomain>/library/<+pipeline.properties.ci.codebase.repoName>:<+pipeline.sequenceId> --port=8080 --kubeconfig cluster$${k8sversion}-kubeconfig
+                                  kubectl expose deployment <+pipeline.properties.ci.codebase.repoName> --port=8080 --target-port=8080 --type=NodePort --kubeconfig cluster$${k8sversion}-kubeconfig
+                                  kubectl get all -A --kubeconfig cluster$${k8sversion}-kubeconfig
+                                  declare -A nodeport_cluster
+                                  nodeport_cluster["$${k8sversion}"]=$(kubectl get svc my-backend-service -o=jsonpath='{.spec.ports[0].nodePort}' --kubeconfig cluster$${k8sversion}-kubeconfig)
+                                  echo "--- $${nodeport_cluster["$${k8sversion}"]}"
+                                  declare -A ip_cluster
+                                  ip_cluster["$${k8sversion}"]=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster<+matrix.k8sversion>-control-plane)
+                                  echo "--- $${ip_cluster["$${k8sversion}"]}"
+                                  counter=0
+                                  until [ $${counter} -ge 120 ] || curl_output=$(curl -sf "http://$${ip_cluster["$${k8sversion}"]}:$${nodeport_cluster["$${k8sversion}"]}/api/v1/configinfo"); do
+                                      echo -n "."
+                                      sleep 1
+                                      counter=$((counter + 1))
+                                  done
+                                  echo "---"
+                                  if [ -z "$${curl_output}" ]; then
+                                      echo "Failed after $${counter} attempts"
+                                      exit 1
+                                  fi       
+                                  if [ -n "$${curl_output}" ]; then
+                                    echo "Data fetched successfully:"
+                                    echo "$${curl_output}" | jq .  
+                                  fi
+                - step:
+                    identifier: dopgsqlintdeploy
+                    type: Background
+                    spec:
+                      envVariables:
+                        SPRING_PROFILES_ACTIVE: test
+                        SPRING_DATASOURCE_URL: jdbc:postgresql://mydependencies_mypostgres:5432/mytestdb
+                        SPRING_DATASOURCE_USERNAME: admin
+                        SPRING_DATASOURCE_PASSWORD: admin  
+    properties:
+      ci:
+        codebase:
+          build:
+            type: PR
+            spec:
+              number: <+trigger.prNumber>

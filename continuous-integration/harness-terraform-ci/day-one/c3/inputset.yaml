@@ -1,0 +1,15 @@
+inputSet:
+  name: ${inputset_name}
+  identifier: ${inputset_identifier}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  tags: {}
+  pipeline:
+    identifier: ${pipeline_identifier}
+    properties:
+      ci:
+        codebase:
+          build:
+            type: branch
+            spec:
+              branch: myfeature1branch

@@ -1,0 +1,40 @@
+inputSet:
+  name: ${inputset_name}
+  identifier: ${inputset_identifier}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  tags: {}
+  pipeline:
+    identifier: ${pipeline_identifier}
+    stages:
+      - stage:
+          identifier: mybuild
+          type: CI
+          spec:
+            execution:
+              steps:
+                - parallel:
+                    - step:
+                        identifier: docompilecode
+                        type: Run
+                        spec:
+                          command: mvn compile
+                - parallel:
+                    - step:
+                        identifier: dorununittest
+                        type: RunTests
+                        spec:
+                          args: test
+                          reports:
+                            type: JUnit
+                            spec:
+                              paths:
+                                - "**/*.xml"
+    properties:
+      ci:
+        codebase:
+          build:
+            type: branch
+            spec:
+              branch: myfeature2branch
+

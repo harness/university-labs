@@ -1,0 +1,26 @@
+template:
+  name: ${template_name}
+  identifier: ${template_name}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  versionLabel: 0.0.1
+  type: Step
+  spec:
+    type: Run
+    spec:
+      shell: Sh
+      command: |-
+        STAGEDIR=/root/myscan/containerimagevulnerabilities/grype
+        DOWNLOADURL=https://raw.githubusercontent.com/anchore/grype/main/templates/junit.tmpl
+        FILENAME=junit.tmpl
+        mkdir -p $${STAGEDIR}
+        curl -s -L -o $${STAGEDIR}/$${FILENAME} $${DOWNLOADURL}
+        curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+        grype harbor.<+variable.mydomain>/library/<+pipeline.properties.ci.codebase.repoName>:<+pipeline.sequenceId> -o template -t $${STAGEDIR}/junit.tmpl > grypereport.xml
+        ls -ltra
+        docker rmi harbor.<+variable.mydomain>/library/<+pipeline.properties.ci.codebase.repoName>:<+pipeline.sequenceId>
+      reports:
+        type: JUnit
+        spec:
+          paths:
+            - /harness/grypereport.xml

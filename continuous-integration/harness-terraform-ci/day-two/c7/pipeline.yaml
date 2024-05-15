@@ -1,0 +1,271 @@
+pipeline:
+  name: ${pipeline_name}
+  identifier: ${pipeline_identifier}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  tags: {}
+  stages:
+    - stage:
+        name: mybuild
+        identifier: mybuild
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - stepGroup:
+                  name: mydependencies
+                  identifier: mydependencies
+                  template:
+                    templateRef: autopgsqlstepgrouptemplate
+                    versionLabel: 0.0.1
+                    templateInputs:
+                      steps:
+                        - step:
+                            identifier: mypostgres
+                            type: Background
+                            spec:
+                              portBindings:
+                                "5432": <+execution.steps.mydependencies.variables.POSTGRES_PORT>
+                      variables:
+                        - name: POSTGRES_USER
+                          type: String
+                          value: admin
+                        - name: POSTGRES_PASSWORD
+                          type: String
+                          value: admin
+                        - name: POSTGRES_DB
+                          type: String
+                          value: mytestdb
+                        - name: POSTGRES_PORT
+                          type: String
+                          value: "5432"
+                        - name: POSTGRES_HOST
+                          type: String
+                          value: localhost
+                        - name: POSTGRES_VERSION
+                          type: String
+                          value: "16"
+              - step:
+                  type: Run
+                  name: docompilecode
+                  identifier: docompilecode
+                  spec:
+                    shell: Sh
+                    command: <+input>
+                    envVariables:
+                      JAVA_HOME: /usr/lib/jvm/temurin-17-jdk-amd64
+              - step:
+                  type: RunTests
+                  name: dorununittest
+                  identifier: dorununittest
+                  spec:
+                    language: Java
+                    buildTool: Maven
+                    args: <+input>
+                    runOnlySelectedTests: true
+                    reports:
+                      type: JUnit
+                      spec:
+                        paths: <+input>
+                    envVariables:
+                      JAVA_HOME: /usr/lib/jvm/temurin-17-jdk-amd64
+                    enableTestSplitting: true
+                    testSplitStrategy: TestCount
+              - parallel:
+                  - step:
+                      name: dopmdcodequalitycheck
+                      identifier: dopmdcodequalitycheck
+                      template:
+                        templateRef: autopmdchecksteptemplate
+                        versionLabel: 0.0.1
+                  - step:
+                      name: doleakedsecretscan
+                      identifier: doleakedsecretscan
+                      template:
+                        templateRef: autoleakedsecretscansteptemplate
+                        versionLabel: 0.0.1
+                  - step:
+                      name: docodevulnerabilityscan
+                      identifier: docodevulnerabilityscan
+                      template:
+                        templateRef: autocodevulnerabilityscansteptemplate
+                        versionLabel: 0.0.1
+              - step:
+                  type: Run
+                  name: dobuildpackage
+                  identifier: dobuildpackage
+                  spec:
+                    shell: Sh
+                    command: <+input>
+                    envVariables:
+                      JAVA_HOME: /usr/lib/jvm/temurin-17-jdk-amd64
+              - step:
+                  type: Run
+                  name: dopublishpackage
+                  identifier: dopublishpackage
+                  spec:
+                    shell: Sh
+                    command: <+input>
+              - parallel:
+                  - step:
+                      type: Plugin
+                      name: dopublishmetadata
+                      identifier: dopublishmetadata
+                      spec:
+                        connectorRef: mycontainerregistryconnector
+                        image: harbor.<+variable.mydomain>/library/artifact-metadata-publisher:latest
+                        settings:
+                          file_urls: https://nexus.<+variable.mydomain>/repository/maven-releases/com/auto/mybackendservice/0.0.<+pipeline.sequenceId>/mybackendservice-0.0.<+pipeline.sequenceId>.jar
+                  - step:
+                      type: Plugin
+                      name: dopmdtojunitplugin
+                      identifier: dopmdtojunitplugin
+                      spec:
+                        connectorRef: mycontainerregistryconnector
+                        image: harbor.<+variable.mydomain>/library/pluginpmdtojunitxml:latest
+                        reports:
+                          type: JUnit
+                          spec:
+                            paths:
+                              - /harness/pmdjunitreport.xml
+                        settings:
+                          PMD_XML_FILE: pmdreport.xml
+              - step:
+                  type: Run
+                  name: dobuildcontainerimage
+                  identifier: dobuildcontainerimage
+                  spec:
+                    shell: Sh
+                    command: <+input>
+              - step:
+                  type: Run
+                  name: doruncontainerimagesmoketest
+                  identifier: doruncontainerimagesmoketest
+                  spec:
+                    shell: Sh
+                    command: <+input>
+              - step:
+                  name: docontainerimagevulnerabiliyscan
+                  identifier: docontainerimagevulnerabiliyscan
+                  template:
+                    templateRef: autocontainerimagevulnerabilityscan
+                    versionLabel: 0.0.1
+              - stepGroup:
+                  name: formainbranchonly
+                  identifier: formainbranchonly
+                  steps:
+                    - step:
+                        type: Run
+                        name: mysigncontainerimage
+                        identifier: mysigncontainerimage
+                        spec:
+                          shell: Sh
+                          command: echo "Sign Container Image"
+                        when:
+                          stageStatus: Success
+                    - step:
+                        type: BuildAndPushDockerRegistry
+                        name: dobuildandpushcontainerimage
+                        identifier: dobuildandpushcontainerimage
+                        spec:
+                          connectorRef: mycontainerregistryconnector
+                          repo: <+input>
+                          tags: <+input>
+                          caching: true
+                    - step:
+                        type: Run
+                        name: dorunintegrationtest
+                        identifier: dorunintegrationtest
+                        spec:
+                          shell: Bash
+                          command: <+input>
+                        strategy:
+                          matrix:
+                            k8sversion:
+                              - v1.26.14
+                              - v1.27.11
+                              - v1.28.7
+                            nodeName: <+matrix.k8sversion>
+                    - step:
+                        type: Background
+                        name: dopgsqlintdeploy
+                        identifier: dopgsqlintdeploy
+                        spec:
+                          connectorRef: mycontainerregistryconnector
+                          image: harbor.<+variable.mydomain>/library/my-backend-service:<+pipeline.sequenceId>
+                          shell: Sh
+                          command: java -jar /app/ums.jar
+                          envVariables:
+                            SPRING_PROFILES_ACTIVE: test
+                            SPRING_DATASOURCE_URL: jdbc:postgresql://mydependencies_mypostgres:5432/mytestdb
+                            SPRING_DATASOURCE_USERNAME: admin
+                            SPRING_DATASOURCE_PASSWORD: admin
+                          portBindings:
+                            "8080": "8080"
+                    - step:
+                        type: Run
+                        name: dopgsqlinttest
+                        identifier: dopgsqlinttest
+                        spec:
+                          shell: Sh
+                          command: |-
+                            counter=0
+                            until [ $${counter} -ge 120 ] || curl_output=$(curl -sf "http://localhost:8080/api/v1/configinfo"); do
+                                echo -n "."
+                                sleep 1
+                                counter=$((counter + 1))
+                            done
+                            echo "---"
+                            if [ -z "$${curl_output}" ]; then
+                                echo "Failed after $${counter} attempts"
+                                exit 1
+                            fi       
+                            if [ -n "$${curl_output}" ]; then
+                              echo "Data fetched successfully:"
+                              echo "$${curl_output}" | jq .  
+                              active_profile_value=$(echo "$${curl_output}" | jq -r '.activeProfile')
+                              if [ "$${active_profile_value}" = "test" ]; then
+                                echo "Spring Profile set to $${active_profile_value}. PGSQL integration test passed."
+                              else
+                                echo "Spring Profile set to $${active_profile_value}. PGSQL integration test failed."
+                                exit 1
+                              fi
+                            fi                           
+                  when:
+                    stageStatus: Success
+          caching:
+            enabled: true
+            paths:
+              - /root/.m2/
+              - /root/myscan/
+  properties:
+    ci:
+      codebase:
+        repoName: my-backend-service
+        build: <+input>
+  notificationRules:
+    - name: doemailnotify
+      identifier: doemailnotify
+      pipelineEvents:
+        - type: PipelineStart
+        - type: PipelineSuccess
+        - type: PipelineFailed
+        - type: StageFailed
+          forStages:
+            - AllStages
+        - type: StepFailed
+      notificationMethod:
+        type: Email
+        spec:
+          userGroups: []
+          recipients:
+            - harsh.vyas@harness.io
+      enabled: true

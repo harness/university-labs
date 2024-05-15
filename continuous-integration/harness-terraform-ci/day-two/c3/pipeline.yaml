@@ -1,0 +1,383 @@
+pipeline:
+  name: ${pipeline_name}
+  identifier: ${pipeline_identifier}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  tags: {}
+  stages:
+    - stage:
+        name: mybuild
+        identifier: mybuild
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - stepGroup:
+                  name: mydependencies
+                  identifier: mydependencies
+                  steps:
+                    - step:
+                        type: Background
+                        name: mypostgres
+                        identifier: mypostgres
+                        spec:
+                          connectorRef: mycontainerregistryconnector
+                          image: harbor.<+variable.mydomain>/library/postgres:16
+                          shell: Bash
+                          envVariables:
+                            POSTGRES_USER: admin
+                            POSTGRES_PASSWORD: admin
+                            POSTGRES_DB: mytestdb
+                          portBindings:
+                            "5432": "5432"
+                    - step:
+                        type: Run
+                        name: mycheckpostgres
+                        identifier: mycheckpostgres
+                        spec:
+                          shell: Sh
+                          command: |-
+                            sleep 15
+                            psql postgresql://admin:admin@localhost:5432/mytestdb && echo "postgres check successful"
+              - parallel:
+                  - step:
+                      type: Run
+                      name: myclonerepo
+                      identifier: myclonerepo
+                      spec:
+                        shell: Sh
+                        command: echo "Clone Git Repo on $(uname -a)"
+                  - step:
+                      type: GitClone
+                      name: dogitclone
+                      identifier: dogitclone
+                      spec:
+                        repoName: my-backend-service
+                        cloneDirectory: /root/my-backend-service
+                        build:
+                          type: branch
+                          spec:
+                            branch: main
+              - parallel:
+                  - step:
+                      type: Run
+                      name: mycompilecode
+                      identifier: mycompilecode
+                      spec:
+                        shell: Sh
+                        command: echo "Compile Code on $(uname -a)"
+                  - step:
+                      type: Run
+                      name: docompilecode
+                      identifier: docompilecode
+                      spec:
+                        shell: Sh
+                        command: <+input>
+                        envVariables:
+                          JAVA_HOME: /usr/lib/jvm/temurin-17-jdk-amd64
+              - parallel:
+                  - step:
+                      type: Run
+                      name: myrununittest
+                      identifier: myrununittest
+                      spec:
+                        shell: Sh
+                        command: echo "Run Unit Tests"
+                  - step:
+                      type: RunTests
+                      name: dorununittest
+                      identifier: dorununittest
+                      spec:
+                        language: Java
+                        buildTool: Maven
+                        args: <+input>
+                        runOnlySelectedTests: true
+                        reports:
+                          type: JUnit
+                          spec:
+                            paths: <+input>
+                        envVariables:
+                          JAVA_HOME: /usr/lib/jvm/temurin-17-jdk-amd64
+                        enableTestSplitting: true
+                        testSplitStrategy: TestCount
+              - parallel:
+                  - step:
+                      type: Run
+                      name: mycheckcodequality
+                      identifier: mycheckcodequality
+                      spec:
+                        shell: Sh
+                        command: echo "Check Code Quality"
+                  - step:
+                      type: Run
+                      name: dopmdchecks
+                      identifier: dopmdchecks
+                      spec:
+                        shell: Sh
+                        command: <+input>
+                        reports:
+                          type: JUnit
+                          spec:
+                            paths: <+input>
+                  - step:
+                      type: Run
+                      name: myscansecrets
+                      identifier: myscansecrets
+                      spec:
+                        shell: Sh
+                        command: echo "Scan for Leaked Secrets"
+                  - step:
+                      type: Run
+                      name: doscansecrets
+                      identifier: doscansecrets
+                      spec:
+                        shell: Sh
+                        command: <+input>
+                        reports:
+                          type: JUnit
+                          spec:
+                            paths: <+input>
+                      failureStrategies:
+                        - onFailure:
+                            errors:
+                              - AllErrors
+                            action:
+                              type: ManualIntervention
+                              spec:
+                                timeout: 10m
+                                onTimeout:
+                                  action:
+                                    type: Abort
+                  - step:
+                      type: Run
+                      name: myscancodevulnerabilities
+                      identifier: myscancodevulnerabilities
+                      spec:
+                        shell: Sh
+                        command: echo "Scan for Code Vulnerabilities"
+                  - step:
+                      type: Run
+                      name: doscancodevulnerabilities
+                      identifier: doscancodevulnerabilities
+                      spec:
+                        shell: Sh
+                        command: <+input>
+                        reports:
+                          type: JUnit
+                          spec:
+                            paths: <+input>
+              - parallel:
+                  - step:
+                      type: Run
+                      name: mybuildpackage
+                      identifier: mybuildpackage
+                      spec:
+                        shell: Sh
+                        command: echo "Build Package"
+                  - step:
+                      type: Run
+                      name: dobuildpackage
+                      identifier: dobuildpackage
+                      spec:
+                        shell: Sh
+                        command: <+input>
+                        envVariables:
+                          JAVA_HOME: /usr/lib/jvm/temurin-17-jdk-amd64
+              - parallel:
+                  - step:
+                      type: Run
+                      name: mypublishpackage
+                      identifier: mypublishpackage
+                      spec:
+                        shell: Sh
+                        command: echo "Publish Package to Artifact Repository"
+                  - step:
+                      type: Run
+                      name: dopublishpackage
+                      identifier: dopublishpackage
+                      spec:
+                        shell: Sh
+                        command: <+input>
+              - parallel:
+                  - step:
+                      type: Run
+                      name: mypublishmetadata
+                      identifier: mypublishmetadata
+                      spec:
+                        shell: Sh
+                        command: echo "Publish Artifact Download URL"
+                  - step:
+                      type: Plugin
+                      name: dopublishmetadata
+                      identifier: dopublishmetadata
+                      spec:
+                        connectorRef: mycontainerregistryconnector
+                        image: harbor.<+variable.mydomain>/library/artifact-metadata-publisher:latest
+                        settings:
+                          file_urls: https://nexus.<+variable.mydomain>/repository/maven-releases/com/auto/mybackendservice/0.0.<+pipeline.sequenceId>/mybackendservice-0.0.<+pipeline.sequenceId>.jar
+                  - step:
+                      type: Run
+                      name: mypublishpmdjunitreport
+                      identifier: mypublishpmdjunitreport
+                      spec:
+                        shell: Sh
+                        command: echo "Convert and Publish PMD XML Report to JUNIT XML format"
+                  - step:
+                      type: Plugin
+                      name: dopmdtojunitplugin
+                      identifier: dopmdtojunitplugin
+                      spec:
+                        connectorRef: mycontainerregistryconnector
+                        image: harbor.<+variable.mydomain>/library/pluginpmdtojunitxml:latest
+                        reports:
+                          type: JUnit
+                          spec:
+                            paths:
+                              - /harness/pmdjunitreport.xml
+                        settings:
+                          PMD_XML_FILE: pmdreport.xml
+              - parallel:
+                  - step:
+                      type: Run
+                      name: mybuildcontainerimage
+                      identifier: mybuildcontainerimage
+                      spec:
+                        shell: Sh
+                        command: echo "Build Container Image"
+                  - step:
+                      type: Run
+                      name: dobuildcontainerimage
+                      identifier: dobuildcontainerimage
+                      spec:
+                        shell: Sh
+                        command: <+input>
+              - parallel:
+                  - step:
+                      type: Run
+                      name: myruncontainerimagesmoketest
+                      identifier: myruncontainerimagesmoketest
+                      spec:
+                        shell: Sh
+                        command: echo "Run Container Image Smoke Test"
+                  - step:
+                      type: Run
+                      name: doruncontainerimagesmoketest
+                      identifier: doruncontainerimagesmoketest
+                      spec:
+                        shell: Sh
+                        command: <+input>
+              - parallel:
+                  - step:
+                      type: Run
+                      name: myscancontainerimagevulnerabilities
+                      identifier: myscancontainerimagevulnerabilities
+                      spec:
+                        shell: Sh
+                        command: echo "Scan for Container Image Vulnerabilities"
+                  - step:
+                      type: Run
+                      name: doscancontainerimagevulnerabilities
+                      identifier: doscancontainerimagevulnerabilities
+                      spec:
+                        shell: Sh
+                        command: <+input>
+                        reports:
+                          type: JUnit
+                          spec:
+                            paths: <+input>
+              - stepGroup:
+                  name: formainbranchonly
+                  identifier: formainbranchonly
+                  steps:
+                    - step:
+                        type: Run
+                        name: mysigncontainerimage
+                        identifier: mysigncontainerimage
+                        spec:
+                          shell: Sh
+                          command: echo "Sign Container Image"
+                        when:
+                          stageStatus: Success
+                    - parallel:
+                        - step:
+                            type: Run
+                            name: mypublishcontainerimage
+                            identifier: mypublishcontainerimage
+                            spec:
+                              shell: Sh
+                              command: echo "Publish Container Image to Container Registry"
+                        - step:
+                            type: BuildAndPushDockerRegistry
+                            name: dobuildandpushcontainerimage
+                            identifier: dobuildandpushcontainerimage
+                            spec:
+                              connectorRef: mycontainerregistryconnector
+                              repo: <+input>
+                              tags: <+input>
+                              caching: true
+                    - parallel:
+                        - step:
+                            type: Run
+                            name: myrunintegrationtest
+                            identifier: myrunintegrationtest
+                            spec:
+                              shell: Sh
+                              command: echo "Run Integration Tests"
+                            when:
+                              stageStatus: Success
+                              condition: "true"
+                        - step:
+                            type: Run
+                            name: dorunintegrationtest
+                            identifier: dorunintegrationtest
+                            spec:
+                              shell: Bash
+                              command: <+input>
+                            strategy:
+                              matrix:
+                                k8sversion:
+                                  - v1.26.14
+                                  - v1.27.11
+                                  - v1.28.7
+                                nodeName: <+matrix.k8sversion>
+                  when:
+                    stageStatus: Success
+              - step:
+                  type: Background
+                  name: dopgsqlintdeploy
+                  identifier: dopgsqlintdeploy
+                  spec:
+                    connectorRef: mycontainerregistryconnector
+                    image: harbor.<+variable.mydomain>/library/my-backend-service:<+pipeline.sequenceId>
+                    shell: Sh
+                    command: java -jar /app/ums.jar
+                    envVariables: <+input>
+                    portBindings:
+                      "8080": "8080"
+              - step:
+                  type: Run
+                  name: dopgsqlinttest
+                  identifier: dopgsqlinttest
+                  spec:
+                    shell: Sh
+                    command: |-
+                      sleep 60
+                      curl localhost:8080/api/v1/configinfo | jq .
+          caching:
+            enabled: true
+            paths:
+              - /root/.m2/
+              - /root/myscan/
+  properties:
+    ci:
+      codebase:
+        repoName: my-backend-service
+        build: <+input>

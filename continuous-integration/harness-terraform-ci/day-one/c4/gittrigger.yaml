@@ -1,0 +1,64 @@
+trigger:
+  name: ${trigger_name}
+  identifier: ${trigger_identifier}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  pipelineIdentifier: ${pipeline_identifier}
+  enabled: true
+  description: ""
+  tags: {}
+  stagesToExecute: []
+  source:
+    type: Webhook
+    spec:
+      type: Harness
+      spec:
+        type: PullRequest
+        spec:
+          connectorRef: ""
+          autoAbortPreviousExecutions: false
+          payloadConditions:
+            - key: targetBranch
+              operator: Equals
+              value: main
+          headerConditions: []
+          repoName: my-backend-service
+          actions:
+            - Merge
+            - Create
+            - Update
+            - Comment
+  inputYaml: |
+    pipeline:
+      identifier: ${pipeline_identifier}
+      stages:
+        - stage:
+            identifier: mybuild
+            type: CI
+            spec:
+              execution:
+                steps:
+                  - parallel:
+                      - step:
+                          identifier: docompilecode
+                          type: Run
+                          spec:
+                            command: mvn compile
+                  - parallel:
+                      - step:
+                          identifier: dorununittest
+                          type: RunTests
+                          spec:
+                            args: test
+                            reports:
+                              type: JUnit
+                              spec:
+                                paths:
+                                  - "**/*.xml"
+      properties:
+        ci:
+          codebase:
+            build:
+              type: PR
+              spec:
+                number: <+trigger.prNumber>

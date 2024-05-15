@@ -1,0 +1,141 @@
+inputSet:
+  name: ${inputset_name}
+  identifier: ${inputset_identifier}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  tags: {}
+  pipeline:
+    identifier: ${pipeline_identifier}
+    stages:
+      - stage:
+          identifier: mybuild
+          type: CI
+          spec:
+            execution:
+              steps:
+                - parallel:
+                    - step:
+                        identifier: docompilecode
+                        type: Run
+                        spec:
+                          command: mvn compile
+                - parallel:
+                    - step:
+                        identifier: dorununittest
+                        type: RunTests
+                        spec:
+                          args: test
+                          reports:
+                            type: JUnit
+                            spec:
+                              paths:
+                                - "**/*.xml"
+                - parallel:
+                    - step:
+                        identifier: dopmdchecks
+                        type: Run
+                        spec:
+                          command: |-
+                            STAGEDIR=/root/myscan/staticcodeanalysis/pmd
+                            DOWNLOADURL=https://github.com/pmd/pmd/releases/download/pmd_releases%2F7.0.0/pmd-dist-7.0.0-bin.zip
+                            FILENAME=pmd.zip
+                            mkdir -p $${STAGEDIR}
+                            curl -s -L -o $${STAGEDIR}/$${FILENAME} $${DOWNLOADURL}
+                            unzip $${STAGEDIR}/$${FILENAME} -d $${STAGEDIR}
+                            $${STAGEDIR}/pmd-bin-7.0.0/bin/pmd check -d /harness/ -R rulesets/java/quickstart.xml -f xml -r pmdreport.xml --no-progress --no-fail-on-violation
+                            cat pmdreport.xml
+                - parallel:
+                    - step:
+                        identifier: doscansecrets
+                        type: Run
+                        spec:
+                          command: |-
+                            STAGEDIR=/root/myscan/secretleaks/gitleaks
+                            DOWNLOADURL=https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz
+                            FILENAME=gitleaks.tar.gz
+                            mkdir -p $${STAGEDIR}
+                            curl -s -L -o $${STAGEDIR}/$${FILENAME} $${DOWNLOADURL}
+                            tar -xvf $${STAGEDIR}/$${FILENAME} -C $${STAGEDIR}
+                            $${STAGEDIR}/gitleaks detect --source /harness/ --no-banner --verbose --report-format JUNIT --report-path /harness/gitleaksreport.xml
+                            cat /harness/gitleaksreport.xml
+                - parallel:
+                    - step:
+                        identifier: doscancodevulnerabilities
+                        type: Run
+                        spec:
+                          command: |-
+                            STAGEDIR=/root/myscan/codevulnerabilities/trivy
+                            DOWNLOADURL=https://github.com/aquasecurity/trivy/releases/download/v0.49.1/trivy_0.49.1_Linux-64bit.deb
+                            FILENAME=trivy.deb
+                            mkdir -p $${STAGEDIR}
+                            curl -s -L -o $${STAGEDIR}/$${FILENAME} $${DOWNLOADURL}
+                            sudo dpkg -i $${STAGEDIR}/$${FILENAME}
+                            curl -s -L -o $${STAGEDIR}/junit.tpl https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/junit.tpl
+                            trivy fs --scanners vuln,secret,misconfig --format template --template "@/root/myscan/codevulnerabilities/trivy/junit.tpl" -o trivyfsreport.xml /harness/
+                - parallel:
+                    - step:
+                        identifier: dobuildpackage
+                        type: Run
+                        spec:
+                          command: mvn -Dmaven.test.skip=true package
+                - parallel:
+                    - step:
+                        identifier: dopublishpackage
+                        type: Run
+                        spec:
+                          command: curl -fsSl -u admin:admin123 --upload-file /harness/target/ums-0.0.1-SNAPSHOT.jar https://nexus.<+variable.mydomain>/repository/maven-releases/com/mybackendservice/0.0.<+pipeline.sequenceId>/mybackendservice-0.0.<+pipeline.sequenceId>.jar
+                - parallel:
+                    - step:
+                        identifier: dobuildcontainerimage
+                        type: Run
+                        spec:
+                          command: |-
+                            docker build -t harbor.<+variable.mydomain>/library/<+pipeline.properties.ci.codebase.repoName>:<+pipeline.sequenceId> .
+                            docker images 
+                - parallel:
+                    - step:
+                        identifier: doruncontainerimagesmoketest
+                        type: Run
+                        spec:
+                          command: |-
+                            docker run -d -p 8080:8080 --name=<+pipeline.properties.ci.codebase.repoName> harbor.<+variable.mydomain>/library/<+pipeline.properties.ci.codebase.repoName>:<+pipeline.sequenceId>
+                            docker ps
+                            sleep 30
+                            curl localhost:8080/api/v1/configinfo | jq
+                            docker stop <+pipeline.properties.ci.codebase.repoName>
+                            sleep 5
+                            docker ps
+                            docker images
+                            docker rm <+pipeline.properties.ci.codebase.repoName>
+                - parallel:
+                    - step:
+                        identifier: doscancontainerimagevulnerabilities
+                        type: Run
+                        spec:
+                          command: |-
+                            STAGEDIR=/root/myscan/containerimagevulnerabilities/grype
+                            DOWNLOADURL=https://raw.githubusercontent.com/anchore/grype/main/templates/junit.tmpl
+                            FILENAME=junit.tmpl
+                            mkdir -p $${STAGEDIR}
+                            curl -s -L -o $${STAGEDIR}/$${FILENAME} $${DOWNLOADURL}
+                            curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+                            grype harbor.<+variable.mydomain>/library/<+pipeline.properties.ci.codebase.repoName>:<+pipeline.sequenceId> -o template -t $${STAGEDIR}/junit.tmpl > grypereport.xml
+                            ls -ltra
+                - stepGroup:
+                    identifier: formainbranchonly
+                    steps:
+                      - parallel:
+                          - step:
+                              identifier: dobuildandpushcontainerimage
+                              type: BuildAndPushDockerRegistry
+                              spec:
+                                repo: harbor.<+variable.mydomain>/library/<+pipeline.properties.ci.codebase.repoName>
+                                tags:
+                                  - <+pipeline.sequenceId>
+    properties:
+      ci:
+        codebase:
+          build:
+            type: PR
+            spec:
+              number: <+trigger.prNumber>

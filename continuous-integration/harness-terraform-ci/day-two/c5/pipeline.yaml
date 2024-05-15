@@ -1,0 +1,81 @@
+pipeline:
+  name: ${pipeline_name}
+  identifier: ${pipeline_identifier}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  tags: {}
+  stages:
+    - stage:
+        name: mybuild
+        identifier: mybuild
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: myk8sclusterconnector
+              namespace: mybuild
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
+          execution:
+            steps:
+              - step:
+                  type: BuildAndPushDockerRegistry
+                  name: dobuildandpushcontainerimage
+                  identifier: dobuildandpushcontainerimage
+                  spec:
+                    connectorRef: mycontainerregistryconnector
+                    repo: harbor.<+variable.mydomain>/library/<+pipeline.properties.ci.codebase.repoName>
+                    tags:
+                      - <+pipeline.sequenceId>
+                    optimize: true
+                    resources:
+                      limits:
+                        memory: 2Gi
+                        cpu: "1"
+              - step:
+                  type: Background
+                  name: dodockerindocker
+                  identifier: dodockerindocker
+                  spec:
+                    connectorRef: mycontainerregistryconnector
+                    image: harbor.<+variable.mydomain>/library/docker:dind
+                    shell: Sh
+                    privileged: true
+              - step:
+                  type: Run
+                  name: dotest
+                  identifier: dotest
+                  spec:
+                    connectorRef: mycontainerregistryconnector
+                    image: harbor.<+variable.mydomain>/library/docker:dind
+                    shell: Sh
+                    command: |-
+                      while ! docker ps ;do
+                            echo "Docker not available yet"
+                            sleep 2
+                      done
+                      echo "Docker Service Ready"
+                      docker ps
+                      docker run -d -p 3000:3000 --name=<+pipeline.properties.ci.codebase.repoName> harbor.<+variable.mydomain>/library/<+pipeline.properties.ci.codebase.repoName>:<+pipeline.sequenceId>
+                      docker ps
+                      sleep 30
+                      docker logs <+pipeline.properties.ci.codebase.repoName>
+                    resources:
+                      limits:
+                        memory: 2Gi
+                        cpu: "1"
+          sharedPaths:
+            - /var/run
+            - /var/lib/docker
+          caching:
+            enabled: false
+            paths: []
+  properties:
+    ci:
+      codebase:
+        repoName: my-frontend-service
+        build: <+input>
