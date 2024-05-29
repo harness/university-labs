@@ -1,0 +1,26 @@
+template:
+  name: ${template_name}
+  identifier: ${template_name}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  versionLabel: 0.0.1
+  type: Step
+  spec:
+    type: Run
+    spec:
+      shell: Sh
+      command: |-
+        STAGEDIR=/root/myscan/codevulnerabilities/trivy
+        DOWNLOADURL=https://github.com/aquasecurity/trivy/releases/download/v0.49.1/trivy_0.49.1_Linux-64bit.deb
+        FILENAME=trivy.deb
+        mkdir -p $${STAGEDIR}
+        [ ! -f "$${STAGEDIR}/$${FILENAME}" ] && curl -s -L -o $${STAGEDIR}/$${FILENAME} $${DOWNLOADURL} 
+        sudo dpkg -i $${STAGEDIR}/$${FILENAME}
+        curl -s -L -o $${STAGEDIR}/junit.tpl https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/junit.tpl
+        trivy fs --scanners vuln,secret,misconfig --format template --template "@/root/myscan/codevulnerabilities/trivy/junit.tpl" -o trivyfsreport.xml /harness/
+      reports:
+        type: JUnit
+        spec:
+          paths:
+            - /harness/trivyfsreport.xml
+

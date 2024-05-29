@@ -1,0 +1,32 @@
+trigger:
+  name: ${trigger_name}
+  identifier: ${trigger_identifier}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  pipelineIdentifier: ${pipeline_identifier}
+  enabled: true
+  description: ""
+  tags: {}
+  stagesToExecute: []
+  source:
+    type: Webhook
+    spec:
+      type: Harness
+      spec:
+        type: PullRequest
+        spec:
+          connectorRef: ""
+          autoAbortPreviousExecutions: false
+          payloadConditions:
+            - key: targetBranch
+              operator: Equals
+              value: main
+          headerConditions: []
+          repoName: my-backend-service
+          actions:
+            - Merge
+            - Create
+            - Update
+            - Comment
+  inputSetRefs:
+    - autoinputsetgittrigger

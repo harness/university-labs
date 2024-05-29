@@ -1,0 +1,19 @@
+template:
+  name: ${template_name}
+  identifier: ${template_name}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  versionLabel: 0.0.1
+  type: Step
+  spec:
+    type: Run
+    spec:
+      shell: Sh
+      command: |-
+        STAGEDIR=/root/myscan/staticcodeanalysis/pmd
+        DOWNLOADURL=https://github.com/pmd/pmd/releases/download/pmd_releases%2F7.0.0/pmd-dist-7.0.0-bin.zip
+        FILENAME=pmd.zip
+        mkdir -p $${STAGEDIR}
+        [ ! -f "$${STAGEDIR}/$${FILENAME}" ] && curl -s -L -o $${STAGEDIR}/$${FILENAME} $${DOWNLOADURL} && unzip $${STAGEDIR}/$${FILENAME} -d $${STAGEDIR}
+        $${STAGEDIR}/pmd-bin-7.0.0/bin/pmd check -d /harness/ -R rulesets/java/quickstart.xml -f xml -r pmdreport.xml --no-progress --no-fail-on-violation
+        cat /harness/pmdreport.xml
