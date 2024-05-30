@@ -11,8 +11,10 @@ variable "account_id" {}
 variable "org_id" {}
 variable "project_id" {}
 variable "pat" {}
-variable "refpipeline" {}
-variable "refinputset" {}
+variable "cosignpubkey" {}
+variable "refpatsecret" {}
+variable "refcosignsecret" {}
+
 
 provider "harness" {
     endpoint            = "https://app.harness.io/gateway"
@@ -20,34 +22,31 @@ provider "harness" {
     platform_api_key    = var.pat
 }
 
-resource "harness_platform_pipeline" "autopipeline" {
-  org_id        = var.org_id
-  project_id    = var.project_id
-  name          = var.refpipeline
-  identifier    = var.refpipeline
-  yaml = templatefile("pipeline.yaml", {
-    org_identifier = var.org_id
-    project_identifier = var.project_id
-    pipeline_name = var.refpipeline
-    pipeline_identifier = var.refpipeline
-  })
+resource "harness_platform_secret_text" "harnesspatsecret" {
+  identifier  = var.refpatsecret
+  name        = var.refpatsecret
+  org_id      = var.org_id
+  project_id  = var.project_id
+  secret_manager_identifier = "harnessSecretManager"
+  value_type                = "Inline"
+  value                     = var.pat
 }
 
-resource "harness_platform_input_set" "inputset" {
-  org_id        = var.org_id
-  project_id    = var.project_id
-  name          = var.refinputset
-  identifier    = var.refinputset
-  pipeline_id   = var.refpipeline
-  yaml          = templatefile("inputset.yaml", {
-    org_identifier = var.org_id
-    project_identifier = var.project_id
-    inputset_name = var.refinputset
-    inputset_identifier = var.refinputset
-    pipeline_identifier = var.refpipeline
-  })
+resource "harness_platform_secret_text" "harnesscosignsecret" {
+  identifier  = var.refcosignsecret
+  name        = var.refcosignsecret
+  org_id      = var.org_id
+  project_id  = var.project_id
+  secret_manager_identifier = "harnessSecretManager"
+  value_type                = "Inline"
+  value                     = var.cosignpublickey
 }
 
-output "myoutput" {
-  value       = harness_platform_pipeline.autopipeline.id
+
+output "myharnesspatsecretoutput" {
+  value       = harness_platform_secret_text.harnesspatsecret.id
+}
+
+output "myharnesscosignsecretoutput" {
+  value       = harness_platform_secret_text.harnesscosignsecret.id
 }
