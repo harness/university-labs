@@ -1,13 +1,13 @@
 trigger:
-  name: ${trigger_name}
+  name: ${trigger_identifier}
   identifier: ${trigger_identifier}
-  projectIdentifier: ${project_identifier}
-  orgIdentifier: ${org_identifier}
-  pipelineIdentifier: ${pipeline_identifier}
   enabled: true
   description: ""
   tags: {}
+  orgIdentifier: ${org_identifier}
   stagesToExecute: []
+  projectIdentifier: ${project_identifier}
+  pipelineIdentifier: ${pipeline_identifier}
   source:
     type: Webhook
     spec:
@@ -17,44 +17,16 @@ trigger:
         spec:
           connectorRef: ""
           autoAbortPreviousExecutions: false
-          payloadConditions:
-            - key: targetBranch
-              operator: Equals
-              value: main
+          payloadConditions: []
           headerConditions: []
-          repoName: my-backend-service
+          repoName: my-web-app
           actions:
-            - Merge
             - Create
             - Update
-            - Comment
+            - Merge
   inputYaml: |
     pipeline:
       identifier: ${pipeline_identifier}
-      stages:
-        - stage:
-            identifier: mybuild
-            type: CI
-            spec:
-              execution:
-                steps:
-                  - parallel:
-                      - step:
-                          identifier: docompilecode
-                          type: Run
-                          spec:
-                            command: mvn compile
-                  - parallel:
-                      - step:
-                          identifier: dorununittest
-                          type: RunTests
-                          spec:
-                            args: test
-                            reports:
-                              type: JUnit
-                              spec:
-                                paths:
-                                  - "**/*.xml"
       properties:
         ci:
           codebase:
