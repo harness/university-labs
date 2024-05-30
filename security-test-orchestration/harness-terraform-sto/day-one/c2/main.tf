@@ -39,7 +39,7 @@ resource "harness_platform_secret_text" "harnesscosignsecret" {
   project_id  = var.project_id
   secret_manager_identifier = "harnessSecretManager"
   value_type                = "Inline"
-  value                     = var.cosignpublickey
+  value                     = var.cosignpubkey
 }
 
 
