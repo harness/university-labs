@@ -5,194 +5,302 @@ pipeline:
   orgIdentifier: ${org_identifier}
   tags: {}
   stages:
-    - stage:
-        name: mybuild
-        identifier: mybuild
-        description: ""
-        type: CI
-        spec:
-          cloneCodebase: true
-          platform:
-            os: Linux
-            arch: Amd64
-          runtime:
-            type: Cloud
-            spec: {}
-          execution:
-            steps:
-              - parallel:
+    - parallel:
+        - stage:
+            description: ""
+            identifier: Static_Tests
+            name: Static Tests
+            spec:
+              cloneCodebase: true
+              execution:
+                steps:
+                  - parallel:
+                      - stepGroup:
+                          name: SAST
+                          identifier: SAST
+                          steps:
+                            - step:
+                                type: Bandit
+                                name: Bandit
+                                identifier: Bandit
+                                spec:
+                                  mode: orchestration
+                                  config: default
+                                  target:
+                                    type: repository
+                                    detection: auto
+                                  advanced:
+                                    log:
+                                      level: info
+                                    fail_on_severity: high
+                                failureStrategies:
+                                  - onFailure:
+                                      errors:
+                                        - AllErrors
+                                      action:
+                                        type: Ignore
+                            - step:
+                                type: Run
+                                name: StatusCheck
+                                identifier: StatusCheck
+                                spec:
+                                  connectorRef: mycontainerregistryconnector
+                                  image: ${container_registry_link}/harness/sto-plugin:1.33.0
+                                  shell: Bash
+                                  command: |-
+                                    apt-get -y update > /dev/null
+                                    apt-get install -y curl > /dev/null
+                                    status="<+pipeline.stages.Static_Tests.spec.execution.steps.SAST.steps.Bandit.status>"
+                                    name="SAST"
+                                    pat=<+secrets.getValue("autoharnesspat")>
+
+                                    if [[ "$status" == "SUCCEEDED" ]]; then
+                                      state="success"
+                                      description="$name scan passed for <+pipeline.properties.ci.codebase.repoName>"
+                                    elif [[ "$status" == "PENDING" ]]; then
+                                      state="pending"
+                                      description="$name scan pending for <+pipeline.properties.ci.codebase.repoName>"
+                                    else
+                                      state="failure"
+                                      description="$name scan failed for <+pipeline.properties.ci.codebase.repoName>"
+                                    fi
+
+                                    curl -X "PUT" 'https://app.harness.io/gateway/code/api/v1/repos/my-web-app/checks/commits/<+trigger.commitSha>?accountIdentifier=<+account.identifier>&orgIdentifier=<+org.identifier>&projectIdentifier=<+project.identifier>' \
+                                      -H "x-api-key: $pat" \
+                                      --data-raw "{ \"ended\": 0, \"identifier\": \"sastcheck\", \"started\": 0, \"link\": \"somelink\", \"status\": \"$state\", \"summary\": \"Static vulnerability testing check\"}"
+                      - stepGroup:
+                          name: SecretDetection
+                          identifier: SecretDetection
+                          steps:
+                            - step:
+                                type: Gitleaks
+                                name: Gitleaks
+                                identifier: Gitleaks_1
+                                spec:
+                                  mode: orchestration
+                                  config: default
+                                  target:
+                                    type: repository
+                                    detection: auto
+                                  advanced:
+                                    log:
+                                      level: info
+                                    fail_on_severity: medium
+                                    args:
+                                      cli: "--config gitleaks.toml"
+                                failureStrategies:
+                                  - onFailure:
+                                      errors:
+                                        - AllErrors
+                                      action:
+                                        type: Ignore
+                            - step:
+                                type: Run
+                                name: StatusCheck
+                                identifier: StatusCheck
+                                spec:
+                                  connectorRef: mycontainerregistryconnector
+                                  image: ${container_registry_link}/harness/sto-plugin:1.33.0
+                                  shell: Bash
+                                  command: |-
+                                    apt-get -y update > /dev/null
+                                    apt-get install -y curl > /dev/null
+                                    status="<+pipeline.stages.Static_Tests.spec.execution.steps.SecretDetection.steps.Gitleaks.status>"
+                                    name="SecretDetection"
+                                    pat=<+secrets.getValue("autoharnesspat")>
+
+                                    if [[ "$status" == "SUCCEEDED" ]]; then
+                                      state="success"
+                                      description="$name scan passed for <+pipeline.properties.ci.codebase.repoName>"
+                                    elif [[ "$status" == "PENDING" ]]; then
+                                      state="pending"
+                                      description="$name scan pending for <+pipeline.properties.ci.codebase.repoName>"
+                                    else
+                                      state="failure"
+                                      description="$name scan failed for <+pipeline.properties.ci.codebase.repoName>"
+                                    fi
+
+                                    curl -X "PUT" 'https://app.harness.io/gateway/code/api/v1/repos/my-web-app/checks/commits/<+trigger.commitSha>?accountIdentifier=<+account.identifier>&orgIdentifier=<+org.identifier>&projectIdentifier=<+project.identifier>' \
+                                      -H "x-api-key: $pat" \
+                                      --data-raw "{ \"ended\": 0, \"identifier\": \"secretdetectioncheck\", \"started\": 0, \"link\": \"somelink\", \"status\": \"$state\", \"summary\": \"Secret detection check\"}"
+              infrastructure:
+                type: KubernetesDirect
+                spec:
+                  connectorRef: myk8sclusterconnector
+                  namespace: mybuild
+                  automountServiceAccountToken: true
+                  nodeSelector: {}
+                  harnessImageConnectorRef: mycontainerregistryconnector
+                  os: Linux
+            type: SecurityTests
+        - stage:
+            name: SCA
+            identifier: SCA
+            description: ""
+            type: SecurityTests
+            spec:
+              cloneCodebase: true
+              platform:
+                os: Linux
+                arch: Amd64
+              runtime:
+                type: Cloud
+                spec: {}
+              execution:
+                steps:
+                  - stepGroup:
+                      name: DependencyScanning
+                      identifier: DependencyScanning
+                      steps:
+                        - step:
+                            type: Owasp
+                            name: Owasp
+                            identifier: Owasp
+                            spec:
+                              mode: orchestration
+                              config: default
+                              target:
+                                type: repository
+                                detection: auto
+                              advanced:
+                                log:
+                                  level: info
+                                fail_on_severity: critical
+                            failureStrategies:
+                              - onFailure:
+                                  errors:
+                                    - AllErrors
+                                  action:
+                                    type: Ignore
+                        - step:
+                            type: Run
+                            name: DependencyScanning
+                            identifier: DependencyScanning
+                            spec:
+                              shell: Bash
+                              command: |-
+                                status="<+pipeline.stages.SCA.spec.execution.steps.DependencyScanning.steps.Owasp.status>"
+                                name="DependencyScan"
+                                pat=<+secrets.getValue("autoharnesspat")>
+
+                                if [[ "$status" == "SUCCEEDED" ]]; then
+                                  state="success"
+                                  description="$name scan passed for <+pipeline.properties.ci.codebase.repoName>"
+                                elif [[ "$status" == "PENDING" ]]; then
+                                  state="pending"
+                                  description="$name scan pending for <+pipeline.properties.ci.codebase.repoName>"
+                                else
+                                  state="failure"
+                                  description="$name scan failed for <+pipeline.properties.ci.codebase.repoName>"
+                                fi
+
+                                curl -X "PUT" 'https://app.harness.io/gateway/code/api/v1/repos/my-web-app/checks/commits/<+trigger.commitSha>?accountIdentifier=<+account.identifier>&orgIdentifier=<+org.identifier>&projectIdentifier=<+project.identifier>' \
+                                  -H "x-api-key: $pat" \
+                                  --data-raw "{ \"ended\": 0, \"identifier\": \"dependencycheck\", \"started\": 0, \"link\": \"somelink\", \"status\": \"$state\", \"summary\": \"Dependency vulnerability check\"}"
+    - parallel:
+        - stage:
+            description: ""
+            identifier: Build_and_Test_App
+            name: Build App
+            spec:
+              caching:
+                enabled: false
+                paths: []
+              cloneCodebase: true
+              execution:
+                steps:
                   - step:
-                      type: Run
-                      name: myclonerepo
-                      identifier: myclonerepo
+                      identifier: Build_and_Push_App
+                      name: Build and Push App
                       spec:
-                        shell: Sh
-                        command: echo "Clone Git Repo on $(uname -a)"
+                        connectorRef: mycontainerregistryconnector
+                        repo: harbor.k3s-vm-sandbox.yxecoxmiwtd7.instruqt.io/library/sqli
+                        tags:
+                          - <+codebase.branch>-<+codebase.commitSha>
+                        dockerfile: Dockerfile.app
+                      type: BuildAndPushDockerRegistry
                   - step:
-                      type: GitClone
-                      name: dogitclone
-                      identifier: dogitclone
+                      type: AquaTrivy
+                      name: AquaTrivy
+                      identifier: AquaTrivy
                       spec:
-                        repoName: my-backend-service
-                        cloneDirectory: /root/my-backend-service
-                        build:
-                          type: branch
-                          spec:
-                            branch: main
-              - parallel:
+                        mode: orchestration
+                        config: default
+                        target:
+                          type: container
+                          detection: auto
+                        advanced:
+                          log:
+                            level: info
+                        privileged: true
+                        image:
+                          type: docker_v2
+                          name: library/sqli
+                          domain: " harbor.k3s-vm-sandbox.yxecoxmiwtd7.instruqt.io"
+                          access_id: admin
+                          access_token: <+secrets.getValue("mycontainerregistrysecret")>
+                          tag: <+codebase.branch>-<+codebase.commitSha>
+                        sbom:
+                          format: spdx-json
+              platform:
+                os: Linux
+                arch: Amd64
+              runtime:
+                type: Cloud
+                spec: {}
+              sharedPaths:
+                - /var/run
+            type: CI
+        - stage:
+            description: ""
+            identifier: Build_DB
+            name: Build DB
+            spec:
+              cloneCodebase: true
+              execution:
+                steps:
                   - step:
-                      type: Run
-                      name: mycompilecode
-                      identifier: mycompilecode
+                      identifier: Build_and_Push_DB
+                      name: Build and Push DB
                       spec:
-                        shell: Sh
-                        command: echo "Compile Code on $(uname -a)"
+                        connectorRef: mycontainerregistryconnector
+                        repo: harbor.k3s-vm-sandbox.yxecoxmiwtd7.instruqt.io/library/postgres
+                        tags:
+                          - <+codebase.branch>-<+codebase.commitSha>
+                        dockerfile: Dockerfile.db
+                      type: BuildAndPushDockerRegistry
                   - step:
-                      type: Run
-                      name: docompilecode
-                      identifier: docompilecode
+                      type: AquaTrivy
+                      name: AquaTrivy
+                      identifier: AquaTrivy
                       spec:
-                        shell: Sh
-                        command: <+input>
-                        envVariables:
-                          JAVA_HOME: /usr/lib/jvm/temurin-17-jdk-amd64
-              - parallel:
-                  - step:
-                      type: Run
-                      name: myrununittest
-                      identifier: myrununittest
-                      spec:
-                        shell: Sh
-                        command: echo "Run Unit Tests"
-                  - step:
-                      type: RunTests
-                      name: dorununittest
-                      identifier: dorununittest
-                      spec:
-                        language: Java
-                        buildTool: Maven
-                        args: <+input>
-                        runOnlySelectedTests: true
-                        reports:
-                          type: JUnit
-                          spec:
-                            paths: <+input>
-                        envVariables:
-                          JAVA_HOME: /usr/lib/jvm/temurin-17-jdk-amd64
-                        enableTestSplitting: false
-              - parallel:
-                  - step:
-                      type: Run
-                      name: mycheckcodequality
-                      identifier: mycheckcodequality
-                      spec:
-                        shell: Sh
-                        command: echo "Check Code Quality"
-                  - step:
-                      type: Run
-                      name: dopmdchecks
-                      identifier: dopmdchecks
-                      spec:
-                        shell: Sh
-                        command: <+input>
-              - parallel:
-                  - step:
-                      type: Run
-                      name: myscansecrets
-                      identifier: myscansecrets
-                      spec:
-                        shell: Sh
-                        command: echo "Scan for Leaked Secrets"
-                  - step:
-                      type: Run
-                      name: doscansecrets
-                      identifier: doscansecrets
-                      spec:
-                        shell: Sh
-                        command: <+input>
-              - parallel:
-                  - step:
-                      type: Run
-                      name: myscancodevulnerabilities
-                      identifier: myscancodevulnerabilities
-                      spec:
-                        shell: Sh
-                        command: echo "Scan for Code Vulnerabilities"
-                  - step:
-                      type: Run
-                      name: doscancodevulnerabilities
-                      identifier: doscancodevulnerabilities
-                      spec:
-                        shell: Sh
-                        command: <+input>
-              - step:
-                  type: Run
-                  name: myscansca
-                  identifier: myscansca
-                  spec:
-                    shell: Sh
-                    command: echo "Perform Software Composition Analysis (SCA) Scan"
-              - step:
-                  type: Run
-                  name: mybuildpackage
-                  identifier: mybuildpackage
-                  spec:
-                    shell: Sh
-                    command: echo "Build Package"
-              - step:
-                  type: Run
-                  name: mypublishpackage
-                  identifier: mypublishpackage
-                  spec:
-                    shell: Sh
-                    command: echo "Publish Package to Artifact Repository"
-              - step:
-                  type: Run
-                  name: mybuildcontainerimage
-                  identifier: mybuildcontainerimage
-                  spec:
-                    shell: Sh
-                    command: echo "Build Container Image"
-              - step:
-                  type: Run
-                  name: myruncontainerimagesmoketest
-                  identifier: myruncontainerimagesmoketest
-                  spec:
-                    shell: Sh
-                    command: echo "Run Container Image Smoke Test"
-              - step:
-                  type: Run
-                  name: myscancontainerimagevulnerabilities
-                  identifier: myscancontainerimagevulnerabilities
-                  spec:
-                    shell: Sh
-                    command: echo "Scan for Container Image Vulnerabilities"
-              - step:
-                  type: Run
-                  name: mysigncontainerimage
-                  identifier: mysigncontainerimage
-                  spec:
-                    shell: Sh
-                    command: echo "Sign Container Image"
-              - step:
-                  type: Run
-                  name: mypublishcontainerimage
-                  identifier: mypublishcontainerimage
-                  spec:
-                    shell: Sh
-                    command: echo "Publish Container Image to Container Registry"
-              - step:
-                  type: Run
-                  name: myrunintegrationtest
-                  identifier: myrunintegrationtest
-                  spec:
-                    shell: Sh
-                    command: echo "Run Integration Tests"
-          caching:
-            enabled: false
-            paths: []
+                        mode: orchestration
+                        config: default
+                        target:
+                          type: container
+                          detection: auto
+                        advanced:
+                          log:
+                            level: info
+                        privileged: true
+                        image:
+                          type: docker_v2
+                          name: library/postgres
+                          domain: " harbor.k3s-vm-sandbox.yxecoxmiwtd7.instruqt.io"
+                          access_id: admin
+                          access_token: <+secrets.getValue("mycontainerregistrysecret")>
+                          tag: <+codebase.branch>-<+codebase.commitSha>
+                        sbom:
+                          format: spdx-json
+              platform:
+                arch: Amd64
+                os: Linux
+              runtime:
+                spec: {}
+                type: Cloud
+            type: CI
   properties:
     ci:
       codebase:
-        repoName: my-backend-service
+        repoName: my-web-app
         build: <+input>
