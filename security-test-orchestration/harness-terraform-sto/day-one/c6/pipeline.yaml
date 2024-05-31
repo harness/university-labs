@@ -214,7 +214,7 @@ pipeline:
                       name: Build and Push App
                       spec:
                         connectorRef: mycontainerregistryconnector
-                        repo: harbor.k3s-vm-sandbox.yxecoxmiwtd7.instruqt.io/library/sqli
+                        repo: ${container_registry_link}/library/sqli
                         tags:
                           - <+codebase.branch>-<+codebase.commitSha>
                         dockerfile: Dockerfile.app
@@ -236,7 +236,7 @@ pipeline:
                         image:
                           type: docker_v2
                           name: library/sqli
-                          domain: " harbor.k3s-vm-sandbox.yxecoxmiwtd7.instruqt.io"
+                          domain: ${container_registry_link}
                           access_id: admin
                           access_token: <+secrets.getValue("mycontainerregistrysecret")>
                           tag: <+codebase.branch>-<+codebase.commitSha>
@@ -264,7 +264,7 @@ pipeline:
                       name: Build and Push DB
                       spec:
                         connectorRef: mycontainerregistryconnector
-                        repo: harbor.k3s-vm-sandbox.yxecoxmiwtd7.instruqt.io/library/postgres
+                        repo: ${container_registry_link}/library/postgres
                         tags:
                           - <+codebase.branch>-<+codebase.commitSha>
                         dockerfile: Dockerfile.db
@@ -286,7 +286,7 @@ pipeline:
                         image:
                           type: docker_v2
                           name: library/postgres
-                          domain: " harbor.k3s-vm-sandbox.yxecoxmiwtd7.instruqt.io"
+                          domain: ${container_registry_link}
                           access_id: admin
                           access_token: <+secrets.getValue("mycontainerregistrysecret")>
                           tag: <+codebase.branch>-<+codebase.commitSha>
