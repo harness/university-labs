@@ -1,0 +1,36 @@
+trigger:
+  name: ${trigger_identifier}
+  identifier: ${trigger_identifier}
+  enabled: true
+  description: ""
+  tags: {}
+  orgIdentifier: ${org_identifier}
+  stagesToExecute: []
+  projectIdentifier: ${project_identifier}
+  pipelineIdentifier: ${pipeline_identifier}
+  source:
+    type: Webhook
+    spec:
+      type: Harness
+      spec:
+        type: PullRequest
+        spec:
+          connectorRef: ""
+          autoAbortPreviousExecutions: false
+          payloadConditions: []
+          headerConditions: []
+          repoName: my-web-app
+          actions:
+            - Create
+            - Update
+            - Merge
+  inputYaml: |
+    pipeline:
+      identifier: ${pipeline_identifier}
+      properties:
+        ci:
+          codebase:
+            build:
+              type: PR
+              spec:
+                number: <+trigger.prNumber>
