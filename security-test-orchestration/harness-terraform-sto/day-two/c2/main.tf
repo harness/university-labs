@@ -12,9 +12,10 @@ variable "org_id" {}
 variable "project_id" {}
 variable "pat" {}
 variable "refpipeline" {}
+variable "container_registry_link" {}
 variable "refinputset" {}
-variable "refinputsetgittrigger" {}
-variable "refgittrigger" {}
+variable "refcosignsecret" {}
+variable "cosignpubkey" {}
 
 provider "harness" {
     endpoint            = "https://app.harness.io/gateway"
@@ -30,8 +31,8 @@ resource "harness_platform_pipeline" "autopipeline" {
   yaml = templatefile("pipeline.yaml", {
     org_identifier = var.org_id
     project_identifier = var.project_id
-    pipeline_name = var.refpipeline
     pipeline_identifier = var.refpipeline
+    container_registry_link = var.container_registry_link
   })
 }
 
@@ -47,45 +48,24 @@ resource "harness_platform_input_set" "inputset" {
     inputset_name = var.refinputset
     inputset_identifier = var.refinputset
     pipeline_identifier = harness_platform_pipeline.autopipeline.id
+    container_registry_link = var.container_registry_link
   })
 }
 
-resource "harness_platform_input_set" "inputsetgittrigger" {
-  org_id        = var.org_id
-  project_id    = var.project_id
-  name          = var.refinputsetgittrigger
-  identifier    = var.refinputsetgittrigger
-  pipeline_id   = harness_platform_pipeline.autopipeline.id
-  yaml          = templatefile("inputsetforgittrigger.yaml", {
-    org_identifier = var.org_id
-    project_identifier = var.project_id
-    inputset_name = var.refinputsetgittrigger
-    inputset_identifier = var.refinputsetgittrigger
-    pipeline_identifier = harness_platform_pipeline.autopipeline.id
-  })
-}
-
-resource "harness_platform_triggers" "gittrigger" {
-  org_id        = var.org_id
-  project_id    = var.project_id
-  name          = var.refgittrigger
-  identifier    = var.refgittrigger
-  target_id     = harness_platform_pipeline.autopipeline.id
-  yaml          = templatefile("gittrigger.yaml", {
-    org_identifier = var.org_id
-    project_identifier = var.project_id
-    trigger_name = var.refgittrigger
-    trigger_identifier = var.refgittrigger
-    inputset_identifier = harness_platform_input_set.inputsetgittrigger.id
-    pipeline_identifier = harness_platform_pipeline.autopipeline.id
-  })
+resource "harness_platform_secret_text" "harnesscosignsecret" {
+  identifier  = var.refcosignsecret
+  name        = var.refcosignsecret
+  org_id      = var.org_id
+  project_id  = var.project_id
+  secret_manager_identifier = "harnessSecretManager"
+  value_type                = "Inline"
+  value                     = var.cosignpubkey
 }
 
 output "myoutput" {
   value       = {
-    pipeline1 = harness_platform_pipeline.autopipeline.id
-    inputset1 = harness_platform_input_set.inputset.id
-    inputset2 = harness_platform_input_set.inputsetgittrigger.id
-    trigger1  = harness_platform_triggers.gittrigger.id
+    pipeline = harness_platform_pipeline.autopipeline.id
+    inputset = harness_platform_input_set.inputset.id
+    secret = harness_platform_secret_text.harnesscosignsecret.id
   }
 }
