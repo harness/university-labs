@@ -1,0 +1,47 @@
+pipeline:
+  identifier: autostocustomscannerpipeline
+  properties:
+    ci:
+      codebase:
+        repoName: my-web-app-<+project.identifier>
+        build:
+          type: branch
+          spec:
+            branch: main
+  stages:
+    - stage:
+        identifier: Static_Tests
+        type: SecurityTests
+        spec:
+          execution:
+            steps:
+              - stepGroup:
+                  identifier: Flawfinder
+                  steps:
+                    - step:
+                        identifier: RunFlawfinder
+                        type: Run
+                        spec:
+                          connectorRef: mycontainerregistryconnector
+                          image: harbor.<+variable.mydomain>/library/flawfinder:0.0.1
+                    - step:
+                        identifier: FlawfinderIngest
+                        type: CustomIngest
+                        spec:
+                          target:
+                            type: repository
+                            name: my-web-app-<+project.identifier>
+                            variant: main
+                          advanced:
+                            log:
+                              level: info
+                          ingestion:
+                            file: <+pipeline.variables.sharedpath>/<+pipeline.variables.scanreport>
+  variables:
+    - name: scanreport
+      type: String
+      value: flawfinder.sarif
+    - name: sharedpath
+      type: String
+      value: /shared/scan_results
+

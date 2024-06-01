@@ -1,0 +1,73 @@
+pipeline:
+  identifier: ${pipeline_identifier}
+  name: ${pipeline_identifier}
+  orgIdentifier: ${org_identifier}
+  projectIdentifier: ${project_identifier}
+  properties:
+    ci:
+      codebase:
+        repoName: <+input>
+        build: <+input>
+  stages:
+    - stage:
+        description: ""
+        identifier: Static_Tests
+        name: Static Tests
+        spec:
+          caching:
+            enabled: false
+            paths: []
+          cloneCodebase: true
+          execution:
+            steps:
+              - stepGroup:
+                  identifier: Flawfinder
+                  name: Flawfinder
+                  steps:
+                    - step:
+                        identifier: RunFlawfinder
+                        name: RunFlawfinder
+                        spec:
+                          connectorRef: <+input>
+                          image: <+input>
+                          shell: Bash
+                          command: flawfinder --sarif . > <+pipeline.variables.sharedpath>/<+pipeline.variables.scanreport>
+                        type: Run
+                    - step:
+                        type: CustomIngest
+                        name: FlawfinderIngest
+                        identifier: FlawfinderIngest
+                        spec:
+                          mode: ingestion
+                          config: sarif
+                          target:
+                            type: repository
+                            detection: manual
+                            name: <+input>
+                            variant: <+input>
+                          advanced:
+                            log:
+                              level: <+input>
+                          ingestion:
+                            file: <+input>
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          sharedPaths:
+            - <+pipeline.variables.sharedpath>
+        type: SecurityTests
+  tags: {}
+  variables:
+    - name: scanreport
+      type: String
+      description: ""
+      required: false
+      value: <+input>
+    - name: sharedpath
+      type: String
+      description: ""
+      required: false
+      value: <+input>

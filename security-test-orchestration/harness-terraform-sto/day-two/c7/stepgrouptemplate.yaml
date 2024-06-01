@@ -1,0 +1,66 @@
+template:
+  name: ${template_name}
+  identifier: ${template_name}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  versionLabel: 0.0.1
+  type: StepGroup
+  spec:
+    steps:
+      - step:
+          type: Background
+          name: mypostgres
+          identifier: mypostgres
+          spec:
+            connectorRef: mycontainerregistryconnector
+            image: harbor.<+variable.mydomain>/library/postgres:<+stepGroup.variables.POSTGRES_VERSION>
+            shell: Bash
+            envVariables:
+              POSTGRES_USER: <+stepGroup.variables.POSTGRES_USER>
+              POSTGRES_PASSWORD: <+stepGroup.variables.POSTGRES_PASSWORD>
+              POSTGRES_DB: <+stepGroup.variables.POSTGRES_DB>
+              PGPORT: <+stepGroup.variables.POSTGRES_PORT>
+            portBindings: <+input>
+      - step:
+          type: Run
+          name: mycheckpostgres
+          identifier: mycheckpostgres
+          spec:
+            shell: Bash
+            command: |-
+              for i in {1..10}; do \
+              psql postgresql://<+stepGroup.variables.POSTGRES_USER>:<+stepGroup.variables.POSTGRES_PASSWORD>@<+stepGroup.variables.POSTGRES_HOST>:<+stepGroup.variables.POSTGRES_PORT>/<+stepGroup.variables.POSTGRES_DB> -c '\q' \
+              && echo "postgres check successful" && exit 0 \
+              || (echo "Attempt $i failed, retrying in 2 seconds" && sleep 2); done; echo "Failed to connect to Postgres after 10 attempts." && exit 1
+    stageType: CI
+    variables:
+      - name: POSTGRES_USER
+        type: String
+        value: <+input>
+        description: ""
+        required: true
+      - name: POSTGRES_PASSWORD
+        type: String
+        value: <+input>
+        description: ""
+        required: true
+      - name: POSTGRES_DB
+        type: String
+        value: <+input>
+        description: ""
+        required: true
+      - name: POSTGRES_PORT
+        type: String
+        value: <+input>
+        description: ""
+        required: true
+      - name: POSTGRES_HOST
+        type: String
+        value: <+input>
+        description: ""
+        required: true
+      - name: POSTGRES_VERSION
+        type: String
+        value: <+input>
+        description: ""
+        required: true

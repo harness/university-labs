@@ -1,0 +1,204 @@
+pipeline:
+  name: ${pipeline_name}
+  identifier: ${pipeline_identifier}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  tags: {}
+  stages:
+    - parallel:
+        - stage:
+            description: ""
+            identifier: Static_Tests
+            name: Static Tests
+            spec:
+              cloneCodebase: true
+              execution:
+                steps:
+                  - parallel:
+                      - stepGroup:
+                          name: SAST
+                          identifier: SAST
+                          steps:
+                            - step:
+                                type: Bandit
+                                name: Bandit
+                                identifier: Bandit
+                                spec:
+                                  mode: orchestration
+                                  config: default
+                                  target:
+                                    type: repository
+                                    detection: auto
+                                  advanced:
+                                    log:
+                                      level: info
+                                    fail_on_severity: high
+                                failureStrategies:
+                                  - onFailure:
+                                      errors:
+                                        - AllErrors
+                                      action:
+                                        type: Ignore
+                            - step:
+                                type: Run
+                                name: StatusCheck
+                                identifier: StatusCheck
+                                spec:
+                                  connectorRef: mycontainerregistryconnector
+                                  image: ${container_registry_link}/harness/sto-plugin:1.33.0
+                                  shell: Bash
+                                  command: |-
+                                    apt-get -y update > /dev/null
+                                    apt-get install -y curl > /dev/null
+                                    status="<+pipeline.stages.Static_Tests.spec.execution.steps.SAST.steps.Bandit.status>"
+                                    name="SAST"
+                                    pat=<+secrets.getValue("autoharnesspat")>
+
+                                    if [[ "$status" == "SUCCEEDED" ]]; then
+                                      state="success"
+                                      description="$name scan passed for <+pipeline.properties.ci.codebase.repoName>"
+                                    elif [[ "$status" == "PENDING" ]]; then
+                                      state="pending"
+                                      description="$name scan pending for <+pipeline.properties.ci.codebase.repoName>"
+                                    else
+                                      state="failure"
+                                      description="$name scan failed for <+pipeline.properties.ci.codebase.repoName>"
+                                    fi
+
+                                    curl -X "PUT" 'https://app.harness.io/gateway/code/api/v1/repos/my-web-app/checks/commits/<+trigger.commitSha>?accountIdentifier=<+account.identifier>&orgIdentifier=<+org.identifier>&projectIdentifier=<+project.identifier>' \
+                                      -H "x-api-key: $pat" \
+                                      --data-raw "{ \"ended\": 0, \"identifier\": \"sastcheck\", \"started\": 0, \"link\": \"somelink\", \"status\": \"$state\", \"summary\": \"Static vulnerability testing check\"}"
+                      - stepGroup:
+                          name: SecretDetection
+                          identifier: SecretDetection
+                          steps:
+                            - step:
+                                type: Gitleaks
+                                name: Gitleaks
+                                identifier: Gitleaks_1
+                                spec:
+                                  mode: orchestration
+                                  config: default
+                                  target:
+                                    type: repository
+                                    detection: auto
+                                  advanced:
+                                    log:
+                                      level: info
+                                    fail_on_severity: medium
+                                    args:
+                                      cli: "--config gitleaks.toml"
+                                failureStrategies:
+                                  - onFailure:
+                                      errors:
+                                        - AllErrors
+                                      action:
+                                        type: Ignore
+                            - step:
+                                type: Run
+                                name: StatusCheck
+                                identifier: StatusCheck
+                                spec:
+                                  connectorRef: mycontainerregistryconnector
+                                  image: ${container_registry_link}/harness/sto-plugin:1.33.0
+                                  shell: Bash
+                                  command: |-
+                                    apt-get -y update > /dev/null
+                                    apt-get install -y curl > /dev/null
+                                    status="<+pipeline.stages.Static_Tests.spec.execution.steps.SecretDetection.steps.Gitleaks.status>"
+                                    name="SecretDetection"
+                                    pat=<+secrets.getValue("autoharnesspat")>
+
+                                    if [[ "$status" == "SUCCEEDED" ]]; then
+                                      state="success"
+                                      description="$name scan passed for <+pipeline.properties.ci.codebase.repoName>"
+                                    elif [[ "$status" == "PENDING" ]]; then
+                                      state="pending"
+                                      description="$name scan pending for <+pipeline.properties.ci.codebase.repoName>"
+                                    else
+                                      state="failure"
+                                      description="$name scan failed for <+pipeline.properties.ci.codebase.repoName>"
+                                    fi
+
+                                    curl -X "PUT" 'https://app.harness.io/gateway/code/api/v1/repos/my-web-app/checks/commits/<+trigger.commitSha>?accountIdentifier=<+account.identifier>&orgIdentifier=<+org.identifier>&projectIdentifier=<+project.identifier>' \
+                                      -H "x-api-key: $pat" \
+                                      --data-raw "{ \"ended\": 0, \"identifier\": \"secretdetectioncheck\", \"started\": 0, \"link\": \"somelink\", \"status\": \"$state\", \"summary\": \"Secret detection check\"}"
+              infrastructure:
+                type: KubernetesDirect
+                spec:
+                  connectorRef: myk8sclusterconnector
+                  namespace: mybuild
+                  automountServiceAccountToken: true
+                  nodeSelector: {}
+                  harnessImageConnectorRef: mycontainerregistryconnector
+                  os: Linux
+            type: SecurityTests
+        - stage:
+            name: SCA
+            identifier: SCA
+            description: ""
+            type: SecurityTests
+            spec:
+              cloneCodebase: true
+              platform:
+                os: Linux
+                arch: Amd64
+              runtime:
+                type: Cloud
+                spec: {}
+              execution:
+                steps:
+                  - stepGroup:
+                      name: DependencyScanning
+                      identifier: DependencyScanning
+                      steps:
+                        - step:
+                            type: Owasp
+                            name: Owasp
+                            identifier: Owasp
+                            spec:
+                              mode: orchestration
+                              config: default
+                              target:
+                                type: repository
+                                detection: auto
+                              advanced:
+                                log:
+                                  level: info
+                                fail_on_severity: critical
+                            failureStrategies:
+                              - onFailure:
+                                  errors:
+                                    - AllErrors
+                                  action:
+                                    type: Ignore
+                        - step:
+                            type: Run
+                            name: DependencyScanning
+                            identifier: DependencyScanning
+                            spec:
+                              shell: Bash
+                              command: |-
+                                status="<+pipeline.stages.SCA.spec.execution.steps.DependencyScanning.steps.Owasp.status>"
+                                name="DependencyScan"
+                                pat=<+secrets.getValue("autoharnesspat")>
+
+                                if [[ "$status" == "SUCCEEDED" ]]; then
+                                  state="success"
+                                  description="$name scan passed for <+pipeline.properties.ci.codebase.repoName>"
+                                elif [[ "$status" == "PENDING" ]]; then
+                                  state="pending"
+                                  description="$name scan pending for <+pipeline.properties.ci.codebase.repoName>"
+                                else
+                                  state="failure"
+                                  description="$name scan failed for <+pipeline.properties.ci.codebase.repoName>"
+                                fi
+
+                                curl -X "PUT" 'https://app.harness.io/gateway/code/api/v1/repos/my-web-app/checks/commits/<+trigger.commitSha>?accountIdentifier=<+account.identifier>&orgIdentifier=<+org.identifier>&projectIdentifier=<+project.identifier>' \
+                                  -H "x-api-key: $pat" \
+                                  --data-raw "{ \"ended\": 0, \"identifier\": \"dependencycheck\", \"started\": 0, \"link\": \"somelink\", \"status\": \"$state\", \"summary\": \"Dependency vulnerability check\"}"
+  properties:
+    ci:
+      codebase:
+        repoName: my-web-app
+        build: <+input>

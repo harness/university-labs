@@ -1,0 +1,66 @@
+pipeline:
+  identifier: ${pipeline_identifier}
+  name: ${pipeline_name}
+  orgIdentifier: ${org_identifier}
+  projectIdentifier: ${project_identifier}
+  properties:
+    ci:
+      codebase:
+        build:
+          spec:
+            branch: main
+          type: branch
+        repoName: my-web-app-${project_identifier}
+  stages:
+    - stage:
+        description: ""
+        identifier: Static_Tests
+        name: Static Tests
+        spec:
+          caching:
+            enabled: false
+            paths: []
+          cloneCodebase: true
+          execution:
+            steps:
+              - stepGroup:
+                  identifier: Semgrep
+                  name: Semgrep
+                  steps:
+                    - step:
+                        identifier: RunSemgrep
+                        name: RunSemgrep
+                        spec:
+                          shell: Bash
+                          command: |-
+                            python3 -m pip install semgrep
+                            semgrep /harness --sarif --config auto -o /shared/scan_results/semgrep.sarif
+                        type: Run
+                    - step:
+                        identifier: IngestSemgrep
+                        name: IngestSemgrep
+                        spec:
+                          mode: ingestion
+                          config: default
+                          target:
+                            type: repository
+                            detection: manual
+                            name: my-web-app-${project_identifier}
+                            variant: main
+                          advanced:
+                            log:
+                              level: info
+                          ingestion:
+                            file: /shared/scan_results/semgrep.sarif
+                        type: Semgrep
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          sharedPaths:
+            - /shared
+        type: SecurityTests
+  tags: {}
+
