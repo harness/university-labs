@@ -29,7 +29,7 @@ inputSet:
                           type: Run
                           spec:
                             connectorRef: mycontainerregistryconnector
-                            image: ${container_registry_link}/library/flawfinder:0.0.1
+                            image: harbor.<+variable.mydomain>/library/flawfinder:0.0.1
                       - step:
                           identifier: FlawfinderIngest
                           type: CustomIngest

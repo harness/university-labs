@@ -23,7 +23,7 @@ pipeline:
                         type: Run
                         spec:
                           connectorRef: mycontainerregistryconnector
-                          image: harbor.k3s-vm-sandbox.pllj3mjt74vw.instruqt.io/library/flawfinder:0.0.1
+                          image: harbor.<+variable.mydomain>/library/flawfinder:0.0.1
                     - step:
                         identifier: FlawfinderIngest
                         type: CustomIngest
