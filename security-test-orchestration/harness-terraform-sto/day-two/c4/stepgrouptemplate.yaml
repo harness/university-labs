@@ -1,0 +1,37 @@
+template:
+  name: ${template_identifier}
+  type: StepGroup
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  spec:
+    steps:
+      - step:
+          identifier: RunFlawfinder
+          name: RunFlawfinder
+          spec:
+            connectorRef: <+input>
+            image: <+input>
+            shell: Bash
+            command: flawfinder --sarif . > <+pipeline.variables.sharedpath>/<+pipeline.variables.scanreport>
+          type: Run
+      - step:
+          type: CustomIngest
+          name: FlawfinderIngest
+          identifier: FlawfinderIngest
+          spec:
+            mode: ingestion
+            config: sarif
+            target:
+              type: repository
+              detection: manual
+              name: <+input>
+              variant: <+input>
+            advanced:
+              log:
+                level: <+input>
+            ingestion:
+              file: <+input>
+    stageType: SecurityTests
+  identifier: ${template_identifier}
+  versionLabel: 1.0.0
+
