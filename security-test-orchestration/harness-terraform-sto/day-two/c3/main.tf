@@ -27,13 +27,6 @@ resource "harness_platform_pipeline" "autopipeline1" {
   project_id    = var.project_id
   name          = var.refpipeline1
   identifier    = var.refpipeline1
-  git_details {
-    branch_name    = "main"
-    commit_message = "Create ${var.refpipeline1} in my-harness-configs-${var.project_id}"
-    file_path      = ".harness/${var.refpipeline1}.yaml"
-    store_type     = "REMOTE"
-    repo_name      = "my-harness-configs-${var.project_id}"
-  }
   yaml = templatefile("pipeline1.yaml", {
     org_identifier = var.org_id
     project_identifier = var.project_id
@@ -47,13 +40,6 @@ resource "harness_platform_pipeline" "autopipeline2" {
   project_id    = var.project_id
   name          = var.refpipeline2
   identifier    = var.refpipeline2
-  git_details {
-    branch_name    = "main"
-    commit_message = "Create ${var.refpipeline2} in my-harness-configs-${var.project_id}"
-    file_path      = ".harness/${var.refpipeline2}.yaml"
-    store_type     = "REMOTE"
-    repo_name      = "my-harness-configs-${var.project_id}"
-  }  
   yaml = templatefile("pipeline2.yaml", {
     org_identifier = var.org_id
     project_identifier = var.project_id
