@@ -1,0 +1,46 @@
+inputSet:
+  name: ${inputset_identifier}
+  identifier: ${inputset_identifier}
+  orgIdentifier:  ${org_identifier}
+  projectIdentifier:  ${project_identifier}
+  pipeline:
+    identifier: ${pipeline_identifier}
+    stages:
+      - stage:
+          identifier: Static_Tests
+          type: SecurityTests
+          spec:
+            execution:
+              steps:
+                - parallel:
+                    - stepGroup:
+                        identifier: Flawfinder
+                        template:
+                          templateInputs:
+                            steps:
+                              - step:
+                                  identifier: RunFlawfinder
+                                  type: Run
+                                  spec:
+                                    connectorRef: mycontainerregistryconnector
+                                    image:  harbor.<+variables.mydomain>/library/flawfinder:0.0.1
+                              - step:
+                                  identifier: FlawfinderIngest
+                                  type: CustomIngest
+                                  spec:
+                                    advanced:
+                                      log:
+                                        level: info
+                                    ingestion:
+                                      file: <+pipeline.variables.sharedpath>/<+pipeline.variables.scanreport>
+                                    target:
+                                      type: repository
+                                      name: my-web-app-${project_identifier}
+                                      variant: main
+    variables:
+      - name: sharedpath
+        type: String
+        value: /shared/scan_results
+      - name: scanreport
+        type: String
+        value: flawfinder.sarif
