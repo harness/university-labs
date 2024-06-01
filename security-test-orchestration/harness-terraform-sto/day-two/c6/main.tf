@@ -11,11 +11,9 @@ variable "account_id" {}
 variable "org_id" {}
 variable "project_id" {}
 variable "pat" {}
-variable "refpipeline" {}
-variable "refinputset" {}
-variable "refinputsetgittrigger" {}
-variable "refgittrigger" {}
-variable "refstepgrouptemplate" {}
+variable "refpolicy" {}
+variable "refpolicyset" {}
+variable "reftemplate" {}
 
 provider "harness" {
     endpoint            = "https://app.harness.io/gateway"
@@ -23,87 +21,66 @@ provider "harness" {
     platform_api_key    = var.pat
 }
 
-resource "harness_platform_pipeline" "autopipeline" {
+resource "harness_platform_policy" "mypolicy" {
   org_id        = var.org_id
   project_id    = var.project_id
-  name          = var.refpipeline
-  identifier    = var.refpipeline
-  yaml = templatefile("pipeline.yaml", {
-    org_identifier = var.org_id
-    project_identifier = var.project_id
-    pipeline_name = var.refpipeline
-    pipeline_identifier = var.refpipeline
-  })
+  name        = var.refpolicy
+  identifier  = var.refpolicy
+  description = var.refpolicy
+  rego        = <<-REGO
+package pipeline
+
+import future.keywords.in
+
+# Security Test steps based on security tool that must be present in every Pipeline
+required_templates = [${var.reftemplate}]
+
+# Deny pipelines that are missing required steps
+deny[msg] {
+    # Find all stages ...
+    stage = input.pipeline.stages[_].stage
+
+    # ... that are Security and for Static Testing
+    stage.type in ["SecurityTests"]
+    stage.identifier in ["Static_Tests"]
+
+    # ... and create a list of all templates types in use
+    existing_templates := [s | s = stage.spec.execution.steps[_].parallel[_].stepGroup.template.templateRef]
+
+    # For each required template ...
+    required_template := required_templates[_]
+
+    # ... check if it's present
+    not contains(existing_templates, required_template)
+
+    # Show a human-friendly error message
+    msg := sprintf("stage '%s' is missing required template '%s'", [stage.name, required_template])
 }
 
-resource "harness_platform_input_set" "inputset" {
-  org_id        = var.org_id
-  project_id    = var.project_id
-  name          = var.refinputset
-  identifier    = var.refinputset
-  pipeline_id   = harness_platform_pipeline.autopipeline.id
-  yaml          = templatefile("inputset.yaml", {
-    org_identifier = var.org_id
-    project_identifier = var.project_id
-    inputset_name = var.refinputset
-    inputset_identifier = var.refinputset
-    pipeline_identifier = harness_platform_pipeline.autopipeline.id
-  })
+contains(arr, elem) {
+    arr[_] = elem
+}
+REGO
 }
 
-resource "harness_platform_input_set" "inputsetgittrigger" {
+resource "harness_platform_policyset" "mypolicyset" {
   org_id        = var.org_id
   project_id    = var.project_id
-  name          = var.refinputsetgittrigger
-  identifier    = var.refinputsetgittrigger
-  pipeline_id   = harness_platform_pipeline.autopipeline.id
-  yaml          = templatefile("inputsetforgittrigger.yaml", {
-    org_identifier = var.org_id
-    project_identifier = var.project_id
-    inputset_name = var.refinputsetgittrigger
-    inputset_identifier = var.refinputsetgittrigger
-    pipeline_identifier = harness_platform_pipeline.autopipeline.id
-  })
-}
-
-resource "harness_platform_triggers" "gittrigger" {
-  org_id        = var.org_id
-  project_id    = var.project_id
-  name          = var.refgittrigger
-  identifier    = var.refgittrigger
-  target_id     = harness_platform_pipeline.autopipeline.id
-  yaml          = templatefile("gittrigger.yaml", {
-    org_identifier = var.org_id
-    project_identifier = var.project_id
-    trigger_name = var.refgittrigger
-    trigger_identifier = var.refgittrigger
-    inputset_identifier = harness_platform_input_set.inputsetgittrigger.id
-    pipeline_identifier = harness_platform_pipeline.autopipeline.id
-  })
-}
-
-resource "harness_platform_template" "stepgrouptemplate" {
-  org_id        = var.org_id
-  project_id    = var.project_id
-  name          = var.refstepgrouptemplate
-  identifier    = var.refstepgrouptemplate
-  comments      = ""
-  version       = "0.0.1"
-  is_stable     = true
-  template_yaml = templatefile("stepgrouptemplate.yaml", {
-    org_identifier = var.org_id
-    project_identifier = var.project_id
-    template_name = var.refstepgrouptemplate
-    template_identifier = var.refstepgrouptemplate
-  })
+  name        = var.refpolicyset
+  identifier  = var.refpolicyset
+  description = var.refpolicyset
+  action     = "onsave"
+  type       = "pipeline"
+  enabled    = true
+  policies {
+    identifier = harness_platform_policy.mypolicy.id
+    severity   = "error"
+  }
 }
 
 output "myoutput" {
   value       = {
-    pipeline1 = harness_platform_pipeline.autopipeline.id
-    inputset1 = harness_platform_input_set.inputset.id
-    inputset2 = harness_platform_input_set.inputsetgittrigger.id
-    trigger1  = harness_platform_triggers.gittrigger.id
-    stepgrouptemplate = harness_platform_template.stepgrouptemplate.id
+    policy = harness_platform_policy.mypolicy.id
+    policyset = harness_platform_policyset.mypolicyset.id
   }
 }
