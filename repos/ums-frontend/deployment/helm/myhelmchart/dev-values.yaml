@@ -1,0 +1,15 @@
+createNamespace: true
+image: "/library/my-frontend-service:c30c465e2553ff0ecbf634c50ade82314f4c28d6"
+servicetype: "NodePort"
+mydomain: "k3s-vm-sandbox.xjtgyxagavh9.instruqt.io"
+replicas: 1
+namespace: "mydevns"
+name: "myfrontendservice"
+containerport: 3000
+env:
+  config:
+    HARNESS_BUILD: 1
+  secrets:
+    key2: "value2"
+serviceport: 3000
+nodeport: 31035

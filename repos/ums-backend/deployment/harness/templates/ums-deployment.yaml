@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}-deployment
+  labels:
+    app: {{ .Values.name }}
+spec:
+  replicas: {{int .Values.replicas}}
+  selector:
+    matchLabels:
+      app: {{ .Values.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.name }}
+    spec:
+      containers:
+        - name: {{ .Values.name }}
+          image: {{ .Values.image }}
+          imagePullPolicy: Always
+          # imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 500m
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 256Mi
+          ports:
+            - containerPort: {{ .Values.containerport }}
+          env:
+          - name: SPRING_APPLICATION_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: {{ .Values.name }}-configmap
+                key: {{ .Values.name }}_APPLICATION_NAME
+          - name: SPRING_PROFILES_ACTIVE
+            valueFrom: 
+              configMapKeyRef:
+                name: {{ .Values.name }}-configmap
+                key: SPRING_PROFILES_ACTIVE
+          - name: SPRING_CONFIG_IMPORT
+            valueFrom: 
+              configMapKeyRef:
+                name: {{ .Values.name }}-configmap
+                key: SPRING_CONFIG_IMPORT
+          - name: SPRING.CLOUD.KUBERNETES.DISCOVERY.DISCOVERY-SERVER-URL
+            valueFrom: 
+              configMapKeyRef:
+                name: {{ .Values.name }}-configmap
+                key: SPRING.CLOUD.KUBERNETES.DISCOVERY.DISCOVERY-SERVER-URL
+          - name: JAVA_TOOL_OPTIONS
+            valueFrom: 
+              configMapKeyRef:
+                name: {{ .Values.name }}-configmap
+                key: JAVA_TOOL_OPTIONS
+          - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            valueFrom: 
+              configMapKeyRef:
+                name: {{ .Values.name }}-configmap
+                key: OTEL_EXPORTER_OTLP_ENDPOINT
+          - name: OTEL_METRICS_EXPORTER
+            valueFrom: 
+              configMapKeyRef:
+                name: {{ .Values.name }}-configmap
+                key: OTEL_METRICS_EXPORTER
+          - name: OTEL_SERVICE_NAME
+            value: {{ .Values.name }}

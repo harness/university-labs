@@ -1,0 +1,76 @@
+trigger:
+  name: ${trigger_name}
+  identifier: ${trigger_identifier}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  pipelineIdentifier: ${pipeline_identifier}
+  enabled: true
+  description: ""
+  tags: {}
+  stagesToExecute: []
+  source:
+    type: Webhook
+    spec:
+      type: Harness
+      spec:
+        type: PullRequest
+        spec:
+          connectorRef: ""
+          autoAbortPreviousExecutions: false
+          payloadConditions:
+            - key: sourceBranch
+              operator: NotIn
+              value: main_.*
+          headerConditions: []
+          repoName: ${codebase_name}
+          actions:
+            - Create
+  inputYaml: |
+    pipeline:
+      identifier: ${pipeline_identifier}
+      stages:
+        - stage:
+            identifier: mydevdeploy
+            type: Deployment
+            spec:
+              service:
+                serviceInputs:
+                  serviceDefinition:
+                    type: Kubernetes
+                    spec:
+                      manifests:
+                        - manifest:
+                            identifier: ${service_identifier}releasemanifest
+                            type: ReleaseRepo
+                            spec:
+                              store:
+                                type: HarnessCode
+                                spec:
+                                  paths:
+                                    - ${dev_values_file}
+        - stage:
+            identifier: myproddeploy
+            type: Deployment
+            spec:
+              service:
+                serviceInputs:
+                  serviceDefinition:
+                    type: Kubernetes
+                    spec:
+                      manifests:
+                        - manifest:
+                            identifier: ${service_identifier}releasemanifest
+                            type: ReleaseRepo
+                            spec:
+                              store:
+                                type: HarnessCode
+                                spec:
+                                  paths:
+                                    - ${prod_values_file}                                   
+      properties:
+        ci:
+          codebase:
+            build:
+              type: PR
+              spec:
+                number: <+trigger.prNumber>

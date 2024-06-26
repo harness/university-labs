@@ -1,0 +1,553 @@
+# https://taskfile.dev
+
+version: '3'
+
+includes: # include another task file   
+  
+#output: group # default is interleaved, other options are group or prefixed  
+  
+vars: # global variables ALLCAPS convention
+  GREET: "Hello:"
+  OS_CHECK: "darwin arm64"
+  PROJECT_NAME: ums
+  GROUP_ID: hvtest
+  APP_PORT: 8080
+  APP_NETWORK: "{{.PROJECT_NAME}}-network"
+  APP_NAME: "{{.PROJECT_NAME}}"
+  NAMESPACE: "{{.PROJECT_NAME}}-ns"
+  CONTAINER_TAG: h7
+  CONTAINER_REGISTRY: docker.io
+  CONTAINER_REGISTRY_ACCOUNT: hvharness
+  CONTAINER_REGISTRY_ACCOUNT_SERVICE: "{{.APP_NAME}}"
+  CONTAINER: "{{.CONTAINER_REGISTRY}}/{{.CONTAINER_REGISTRY_ACCOUNT}}/{{.CONTAINER_REGISTRY_ACCOUNT_SERVICE}}:{{.CONTAINER_TAG}}"
+
+env: # environment variables
+
+silent: true # true/false echoing of commands
+
+# ----- Begin Tasks Section -----
+tasks:
+  default:
+    desc: description for default task
+    deps:
+      - hellomars
+    summary: |
+      multi line summary
+      of helloworld task
+    aliases: [def] # shorter taskname
+    preconditions:
+      - sh: uname -sm | grep -i "{{.OS_CHECK}}"
+        msg: "OS does not match {{.OS_CHECK}}."
+    vars: # local variables
+      WHO: "World !!!"
+    cmds:
+      - echo "At:[{{now | date "JAN-02-2006 15:04 EST"}}] From:[$(pwd)] On:[$(hostname)]"
+      - echo "{{.GREET}} {{.WHO}}"
+      - task -l
+  
+  hellomars:
+    desc: hello from mars
+    cmds:
+      - echo "Hello Mars!!!"
+  
+  setup-react-project:
+    cmds:
+      - npm create vite@latest {{.PROJECT_NAME}}-frontend -- --template react
+      - cd {{.PROJECT_NAME}}-frontend && npm install 
+      - cd {{.PROJECT_NAME}}-frontend && npm install bootstrap --save
+      - cd {{.PROJECT_NAME}}-frontend && npm install axios --save
+      - cd {{.PROJECT_NAME}}-frontend && npm install react-router-dom --save
+      - cd {{.PROJECT_NAME}}-frontend/src && mkdir -p components services
+
+  setup-spring-boot-project:
+    cmds:
+      - curl -G https://start.spring.io/starter.zip 
+        -d baseDir={{.PROJECT_NAME}}-backend
+        -d type=maven-project 
+        -d language=java 
+        -d bootVersion=3.2.1
+        -d groupId=com.{{.GROUP_ID}} 
+        -d artifactId={{.PROJECT_NAME}}
+        -d name={{.PROJECT_NAME}}
+        -d packageName=com.{{.GROUP_ID}}.{{.PROJECT_NAME}} 
+        -d packaging=jar
+        -d javaVersion=17
+        -d dependencies=web
+        -d dependencies=actuator 
+        -d dependencies=lombok
+        -d dependencies=validation 
+        -d dependencies=devtools 
+        -d dependencies=data-jpa 
+        -d dependencies=h2
+        -o starter.zip
+      - unzip starter.zip
+      - rm starter.zip
+      - cd {{.PROJECT_NAME}}-backend/src/main/java/com/{{.GROUP_ID}}/{{.PROJECT_NAME}} && mkdir -p entity repository dto mapper service controller exception util audit config constants
+
+# ----- Begin Frontend Section -----
+  frontend-container-create-dockerfile:
+    desc: Creates a Dockerfile for a react project 
+    dir: '{{.USER_WORKING_DIR}}'
+    preconditions: 
+      - sh: test -f package.json
+        msg: "The file 'package.json' does not exist in the current directory {{.USER_WORKING_DIR}}."
+    cmds:
+      - |
+        cat << EOF > Dockerfile
+        FROM node:18-alpine AS base
+
+        # Install dependencies only when needed
+        FROM base AS deps
+        # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+        RUN apk add --no-cache libc6-compat
+        WORKDIR /app
+
+        # Install dependencies based on the preferred package manager
+        COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
+        RUN \
+          if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
+          elif [ -f package-lock.json ]; then npm ci; \
+          elif [ -f pnpm-lock.yaml ]; then yarn global add pnpm && pnpm i --frozen-lockfile; \
+          else echo "Lockfile not found." && exit 1; \
+          fi
+
+
+        # Rebuild the source code only when needed
+        FROM base AS builder
+        WORKDIR /app
+        COPY --from=deps /app/node_modules ./node_modules
+        COPY . .
+
+        # Next.js collects completely anonymous telemetry data about general usage.
+        # Learn more here: https://nextjs.org/telemetry
+        # Uncomment the following line in case you want to disable telemetry during the build.
+        # ENV NEXT_TELEMETRY_DISABLED 1
+
+        # RUN yarn build
+
+        # If using npm comment out above and use below instead
+        RUN npm run build
+
+        # Production image, copy all the files and run next
+        FROM base AS runner
+        WORKDIR /app
+
+        ENV NODE_ENV production
+        # Uncomment the following line in case you want to disable telemetry during runtime.
+        # ENV NEXT_TELEMETRY_DISABLED 1
+
+        RUN addgroup --system --gid 1001 nodejs
+        RUN adduser --system --uid 1001 nextjs
+
+        COPY --from=builder /app/public ./public
+
+        # Set the correct permission for prerender cache
+        RUN mkdir .next
+        RUN chown nextjs:nodejs .next
+
+        # Automatically leverage output traces to reduce image size
+        # https://nextjs.org/docs/advanced-features/output-file-tracing
+        COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+        COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+        USER nextjs
+
+        EXPOSE 3000
+
+        ENV PORT 3000
+        # set hostname to localhost
+        # ENV HOSTNAME "0.0.0.0"
+
+        # server.js is created by next build from the standalone output
+        # https://nextjs.org/docs/pages/api-reference/next-config-js/output
+        CMD ["node", "server.js"]
+        EOF
+
+  # ----- Begin Maven Section -----
+  java-build-jar:
+    desc: Outputs a jar file for a Maven Java project 
+    dir: '{{.USER_WORKING_DIR}}'
+    preconditions:
+      - sh: test -f pom.xml
+        msg: "The file 'pom.xml' does not exist in the current directory {{.USER_WORKING_DIR}}."
+    cmds:
+      - mvn clean package -DskipTests
+
+  java-run-jar:
+    desc: Runs a jar file for a Maven Java project 
+    dir: '{{.USER_WORKING_DIR}}'
+    deps:
+      - task: java-build-jar
+    preconditions:
+      - sh: test -f target/{{.PROJECT_NAME}}-0.0.1-SNAPSHOT.jar
+        msg: "The jar file was not found: target/{{.PROJECT_NAME}}-0.0.1-SNAPSHOT.jar"
+    cmds:
+      - java -jar target/{{.PROJECT_NAME}}-0.0.1-SNAPSHOT.jar
+
+  container-create-dockerfile:
+    desc: Creates a Dockerfile for a Maven project 
+    dir: '{{.USER_WORKING_DIR}}'
+    deps:
+      - task: java-build-jar
+    preconditions:
+      - sh: test -f ./src/main/resources/opentelemetry-javaagent-1.27.0.jar
+        msg: "The file 'opentelemetry-javaagent-1.27.0.jar' does not exist in the current directory {{.USER_WORKING_DIR}}."
+      - sh: test -f target/{{.PROJECT_NAME}}-0.0.1-SNAPSHOT.jar
+        msg: "The jar file was not found: target/{{.PROJECT_NAME}}-0.0.1-SNAPSHOT.jar"
+    cmds:
+      - |
+        cat << EOF > Dockerfile
+        FROM bellsoft/liberica-openjre-alpine:17
+        WORKDIR /app/libs
+        COPY ./src/main/resources/opentelemetry-javaagent-1.27.0.jar /app/libs/opentelemetry-javaagent-1.27.0.jar
+        WORKDIR /app
+        COPY ./target/*.jar ./{{.APP_NAME}}.jar
+        EXPOSE {{.APP_PORT}}
+        ENTRYPOINT ["java","-jar","{{.APP_NAME}}.jar"]
+        EOF
+
+  container-build-image:
+    desc: Builds an image from a Dockerfile using buildx
+    dir: '{{.USER_WORKING_DIR}}'
+    deps:
+      - task: container-create-dockerfile
+    preconditions:
+      - sh: test -f Dockerfile
+        msg: "The file 'Dockerfile' does not exist in the current directory {{.USER_WORKING_DIR}}."
+      - sh: docker version 
+        msg: "Docker is not installed"
+    cmds:
+      - docker build --load -t {{.CONTAINER}} . 
+
+  container-start:
+    desc: Runs a container image
+    dir: '{{.USER_WORKING_DIR}}'
+    deps:
+      - task: container-build-image
+    preconditions:
+      - sh: docker version 
+        msg: "Docker is not installed"
+    cmds:
+      - docker network create {{.APP_NETWORK}}
+      - docker run -d --network {{.APP_NETWORK}} -p {{.APP_PORT}}:{{.APP_PORT}} --name {{.APP_NAME}} {{.CONTAINER}}
+
+  container-stop:
+    desc: Stop a running container
+    dir: '{{.USER_WORKING_DIR}}'
+    preconditions:
+      - sh: docker version 
+        msg: "Docker is not installed"
+    cmds:
+      - docker stop {{.APP_NAME}}
+      - docker rm {{.APP_NAME}}
+      - docker network rm {{.APP_NETWORK}}
+  
+  container-logs:
+    desc: View logs
+    dir: '{{.USER_WORKING_DIR}}'
+    preconditions:
+      - sh: docker version 
+        msg: "Docker is not installed"
+    cmds:
+      - docker logs {{.APP_NAME}}
+  
+  container-exec:
+    desc: Execute a command in the running container
+    dir: '{{.USER_WORKING_DIR}}'
+    preconditions:
+      - sh: docker version 
+        msg: "Docker is not installed"
+    cmds:
+      - docker exec -it {{.APP_NAME}} sh
+
+  container-delete-image:
+    desc: Delete an image
+    dir: '{{.USER_WORKING_DIR}}'
+    preconditions:
+      - sh: docker version 
+        msg: "Docker is not installed"
+    cmds:
+      - docker rmi {{.CONTAINER}} 
+  
+  container-push-image:
+    desc: Pushes a AMD64 and ARM64 image to container registry
+    dir: '{{.USER_WORKING_DIR}}'
+    deps:
+      - task: container-build-image
+    preconditions:
+      - sh: docker version 
+        msg: "Docker is not installed"
+    cmds:
+      - docker build --platform linux/amd64,linux/arm64 --push -t {{.CONTAINER}} . 
+
+  container-pull-image:
+    desc: Pulls an image from container registry
+    dir: '{{.USER_WORKING_DIR}}'
+    preconditions:
+      - sh: docker version 
+        msg: "Docker is not installed"
+    cmds:
+      - docker pull {{.CONTAINER}}
+  
+  k8s-local-install:
+    desc: install local k8s using homebrew for colima
+    cmds:
+      - brew install colima
+      - colima version
+
+  k8s-local-status:
+    desc: check local k8s status
+    cmds:
+      - colima status
+  
+  k8s-local-list:
+    desc: List local k8s
+    cmds:
+      - colima list
+      - task: k8s-local-status
+
+  k8s-local-start:
+    desc: start local k8s with default cpu and memory
+    cmds:
+      - colima start
+      - task: k8s-local-list
+
+  k8s-local-start-custom:
+    desc: give more cpu and ram to local colima k8s cluster
+    cmds:
+      - colima start --with-kubernetes --cpu 4 --memory 6
+      - task: k8s-local-list
+
+  k8s-local-stop:
+    desc: stop local k8s cluster
+    cmds:
+      - colima stop
+      - task: k8s-local-status
+
+  k8s-create-manifest:
+    desc: Create k8s manifest files
+    dir: '{{.USER_WORKING_DIR}}/deployment/k8s-manifests'
+    preconditions:
+      - sh: test -f ../../Dockerfile
+        msg: "Missing Dockerfile - ensure docker images are built first"
+    cmds:
+      - mkdir -p {{.USER_WORKING_DIR}}/deployment/k8s-manifests
+      - |
+        cat << EOF > {{.APP_NAME}}-configmap.yaml
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: {{.APP_NAME}}-configmap
+        data:
+          SPRING_PROFILES_ACTIVE: dev
+          SPRING_CONFIG_IMPORT: "optional:configserver:http://configserver:8071/"
+          SPRING.CLOUD.KUBERNETES.DISCOVERY.DISCOVERY-SERVER-URL: "http://spring-cloud-kubernetes-discoveryserver:80/"
+          CONFIGSERVER_APPLICATION_NAME: configserver
+          {{.PROJECT_NAME}}_APPLICATION_NAME: {{.APP_NAME}}
+          GATEWAY_APPLICATION_NAME: gatewayserver
+          JAVA_TOOL_OPTIONS: "-javaagent:/app/libs/opentelemetry-javaagent-1.27.0.jar"
+          OTEL_EXPORTER_OTLP_ENDPOINT: "http://tempo-grafana-tempo-distributor.observability.svc.cluster.local:4317"
+          OTEL_METRICS_EXPORTER: none
+        EOF
+      - |
+        cat << EOF > {{.APP_NAME}}-deployment.yaml
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: {{.APP_NAME}}-deployment
+          labels:
+            app: {{.APP_NAME}}
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: {{.APP_NAME}}
+          template:
+            metadata:
+              labels:
+                app: {{.APP_NAME}}
+            spec:
+              containers:
+                - name: {{.APP_NAME}}
+                  image: {{.CONTAINER}}
+                  imagePullPolicy: Always
+                  # imagePullPolicy: IfNotPresent
+                  resources:
+                    limits:
+                      cpu: 500m
+                      memory: 1Gi
+                    requests:
+                      cpu: 200m
+                      memory: 256Mi
+                  ports:
+                    - containerPort: {{.APP_PORT}}
+                  env:
+                  - name: SPRING_APPLICATION_NAME
+                    valueFrom:
+                      configMapKeyRef:
+                        name: {{.APP_NAME}}-configmap
+                        key: {{.PROJECT_NAME}}_APPLICATION_NAME
+                  - name: SPRING_PROFILES_ACTIVE
+                    valueFrom: 
+                      configMapKeyRef:
+                        name: {{.APP_NAME}}-configmap
+                        key: SPRING_PROFILES_ACTIVE
+                  - name: SPRING_CONFIG_IMPORT
+                    valueFrom: 
+                      configMapKeyRef:
+                        name: {{.APP_NAME}}-configmap
+                        key: SPRING_CONFIG_IMPORT
+                  - name: SPRING.CLOUD.KUBERNETES.DISCOVERY.DISCOVERY-SERVER-URL
+                    valueFrom: 
+                      configMapKeyRef:
+                        name: {{.APP_NAME}}-configmap
+                        key: SPRING.CLOUD.KUBERNETES.DISCOVERY.DISCOVERY-SERVER-URL
+                  - name: JAVA_TOOL_OPTIONS
+                    valueFrom: 
+                      configMapKeyRef:
+                        name: {{.APP_NAME}}-configmap
+                        key: JAVA_TOOL_OPTIONS
+                  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+                    valueFrom: 
+                      configMapKeyRef:
+                        name: {{.APP_NAME}}-configmap
+                        key: OTEL_EXPORTER_OTLP_ENDPOINT
+                  - name: OTEL_METRICS_EXPORTER
+                    valueFrom: 
+                      configMapKeyRef:
+                        name: {{.APP_NAME}}-configmap
+                        key: OTEL_METRICS_EXPORTER
+                  - name: OTEL_SERVICE_NAME
+                    value: {{.APP_NAME}}
+        EOF
+      - |
+        cat << EOF > {{.APP_NAME}}-service.yaml
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: {{.APP_NAME}}
+        spec:
+          selector:
+            app: {{.APP_NAME}}
+          type: NodePort
+          ports:
+            - protocol: TCP
+              port: {{.APP_PORT}}
+              targetPort: {{.APP_PORT}}
+              nodePort: 30015
+        EOF
+
+  pipeline-k8s-local-deploy:
+    desc: Deploy k8s manifests
+    dir: '{{.USER_WORKING_DIR}}/deployment/k8s-manifests'
+    deps:
+      - task: container-push-image
+      - task: k8s-create-manifest
+    aliases: [pa]
+    preconditions:
+      - sh: kubectl cluster-info
+        msg: "local k8s cluster not running"
+      - sh: kubectl config current-context | grep colima
+        msg: "ensure k8s cluster context is colima"
+    cmds:
+      - kubectl create namespace {{.NAMESPACE}}
+      - kubectl apply -f {{.APP_NAME}}-configmap.yaml
+      - kubectl apply -f {{.APP_NAME}}-deployment.yaml
+      - kubectl apply -f {{.APP_NAME}}-service.yaml
+      - kubectl get all --namespace {{.NAMESPACE}}
+  
+  k8s-local-get-all-in-namespace:
+    desc: Get all resources in a namespace
+    preconditions:
+      - sh: kubectl get deployment {{.APP_NAME}} --namespace {{.NAMESPACE}}
+    cmds:
+      - kubectl get all --namespace {{.NAMESPACE}}
+
+  k8s-local-logs:
+    desc: Get k8s logs for app
+    preconditions:
+      - sh: kubectl get deployment {{.APP_NAME}} --namespace {{.NAMESPACE}}
+    cmds:
+      - kubectl logs -f -l app={{.APP_NAME}} --namespace {{.NAMESPACE}}
+  
+  k8s-pod-exec:
+    desc: Execute a command in a pod
+    dir: '{{.USER_WORKING_DIR}}'
+    preconditions:
+      - sh: kubectl get deployment {{.APP_NAME}} --namespace {{.NAMESPACE}}
+    cmds:
+      - kubectl exec deploy/{{.APP_NAME}} -it --namespace {{.NAMESPACE}} -- sh
+  
+  k8s-local-cleanup-app:
+    desc: Cleanup all app resources deployed on local k8s
+    dir: '{{.USER_WORKING_DIR}}/deployment/k8s-manifests'
+    aliases: [ca]
+    preconditions:
+      - sh: kubectl cluster-info
+        msg: "local k8s cluster not running"
+      - sh: kubectl config current-context | grep colima
+        msg: "ensure k8s cluster context is colima"
+      - sh: kubectl get configmap {{.APP_NAME}}-configmap --namespace {{.NAMESPACE}}
+      - sh: kubectl get deployment {{.APP_NAME}}-deployment --namespace {{.NAMESPACE}}
+      - sh: kubectl get service {{.APP_NAME}} --namespace {{.NAMESPACE}}
+    cmds:
+      - kubectl delete -f {{.APP_NAME}}-configmap.yaml
+      - kubectl delete -f {{.APP_NAME}}-deployment.yaml
+      - kubectl delete -f {{.APP_NAME}}-service.yaml
+      - kubectl delete namespace {{.NAMESPACE}}
+
+  pipeline-k8s-local-observability-deploy:
+    desc: > 
+      Deploy grafana prometheus loki tempo using helm. 
+      For Application: Ensure application.yaml is updated with correct management endpoints. 
+      For PROMETHEUS: Also update values.yaml with correct scrape config.
+      For LOKI: No changes needed for values.yaml they are already there
+      For TEMPO: No changes needed for values.yaml they are already there
+                 However ensure that configmap has 
+                 OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo-grafana-tempo-distributor:4317
+      For GRAFANA: No changes needed for values.yaml they are already there
+    dir: '{{.USER_WORKING_DIR}}'
+    aliases: [po]
+    preconditions:
+      - sh: kubectl cluster-info
+        msg: "local k8s cluster not running"
+      - sh: kubectl config current-context | grep colima
+        msg: "ensure k8s cluster context is colima"
+    cmds:
+      - kubectl create namespace observability
+      - cd kube-prometheus && helm dependencies build
+      - helm install prometheus kube-prometheus --namespace observability 
+      - cd grafana-loki && helm dependencies build
+      - helm install loki grafana-loki --namespace observability 
+      - cd grafana-tempo && helm dependencies build
+      - helm install tempo grafana-tempo --namespace observability 
+      - cd grafana && helm dependencies build
+      - helm install grafana grafana --namespace observability 
+      - helm ls --namespace observability
+  
+  k8s-local-cleanup-observability:
+    desc: Cleanup all observability resources deployed on local k8s
+    dir: '{{.USER_WORKING_DIR}}'
+    aliases: [co]
+    preconditions:
+      - sh: kubectl cluster-info
+        msg: "local k8s cluster not running"
+      - sh: kubectl config current-context | grep colima
+        msg: "ensure k8s cluster context is colima"
+    cmds:
+      - helm uninstall grafana --namespace observability
+      - helm uninstall tempo --namespace observability
+      - helm uninstall loki --namespace observability
+      - helm uninstall prometheus --namespace observability
+      - kubectl delete namespace observability
+      - helm ls --namespace observability
+  
+  k8s-get-grafana-password:
+    desc: Get grafana password
+    preconditions:
+      - sh: kubectl cluster-info
+        msg: "local k8s cluster not running"
+      - sh: kubectl config current-context | grep colima
+        msg: "ensure k8s cluster context is colima"
+    cmds:
+      - kubectl get secret grafana-admin --namespace observability -o jsonpath="{.data.GF_SECURITY_ADMIN_PASSWORD}" | base64 --decode

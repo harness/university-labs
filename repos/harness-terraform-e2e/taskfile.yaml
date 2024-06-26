@@ -1,0 +1,153 @@
+# https://taskfile.dev
+# harsh.vyas@harness.io
+
+version: '3'
+
+includes: # include another task file   
+  
+#output: group # default is interleaved, other options are group or prefixed  
+  
+vars: # global variables ALLCAPS convention
+  GREET: "Hello:"
+  OS_CHECK: "darwin arm64"
+
+env: # environment variables
+
+silent: true # true/false echoing of commands
+
+# ----- Begin Tasks Section -----
+tasks:
+  default:
+    desc: description for default task
+    deps:
+      - hellomars
+    summary: |
+      multi line summary
+      of helloworld task
+    aliases: [def] # shorter taskname
+    preconditions:
+      - sh: uname -sm | grep -i "{{.OS_CHECK}}"
+        msg: "OS does not match {{.OS_CHECK}}."
+    vars: # local variables
+      WHO: "World !!!"
+    cmds:
+      - echo "At:[{{now | date "JAN-02-2006 15:04 EST"}}] From:[$(pwd)] On:[$(hostname)]"
+      - echo "{{.GREET}} {{.WHO}}"
+      - task -l
+  
+  hellomars:
+    desc: hello from mars
+    cmds:
+      - echo "Hello Mars!!!"
+
+  terraform-admin-setup:
+    desc: Terraform commands for admin
+    vars:
+      BASE_DIR: "environments/admin"
+      DATA_DIR: "{{.BASE_DIR}}/tf/.terraform"
+    cmds:
+      - TF_DATA_DIR={{.DATA_DIR}} terraform init -backend-config=path={{.BASE_DIR}}/tf/terraform.tfstate
+      - TF_DATA_DIR={{.DATA_DIR}} terraform plan -var-file={{.BASE_DIR}}/values.tfvars -out={{.BASE_DIR}}/tf/plan.tfplan
+      - TF_DATA_DIR={{.DATA_DIR}} terraform apply -auto-approve {{.BASE_DIR}}/tf/plan.tfplan 
+
+  terraform-student-setup:
+    desc: Terraform commands for student
+    vars:
+      BASE_DIR: "environments/student"
+      DATA_DIR: "{{.BASE_DIR}}/tf/.terraform"
+    cmds:
+      - TF_DATA_DIR={{.DATA_DIR}} terraform init -backend-config=path={{.BASE_DIR}}/tf/terraform.tfstate
+      - TF_DATA_DIR={{.DATA_DIR}} terraform plan -var-file={{.BASE_DIR}}/values.tfvars -out={{.BASE_DIR}}/tf/plan.tfplan -target=module.organization -target=module.project
+      - TF_DATA_DIR={{.DATA_DIR}} terraform apply -auto-approve {{.BASE_DIR}}/tf/plan.tfplan 
+
+  terraform-launch-setup:
+    desc: Terraform commands for launch
+    vars:
+      BASE_DIR: "environments/launch"
+      DATA_DIR: "{{.BASE_DIR}}/tf/.terraform"
+    cmds:
+      - TF_DATA_DIR={{.DATA_DIR}} terraform init -backend-config=path={{.BASE_DIR}}/tf/terraform.tfstate
+      - TF_DATA_DIR={{.DATA_DIR}} terraform plan -var-file={{.BASE_DIR}}/values.tfvars -out={{.BASE_DIR}}/tf/plan.tfplan
+      - TF_DATA_DIR={{.DATA_DIR}} terraform apply -auto-approve {{.BASE_DIR}}/tf/plan.tfplan 
+
+  terraform-launch-ci-ilt:
+    desc: Terraform commands for launching CI ILT
+    vars:
+      BASE_DIR: "environments/launch"
+      DATA_DIR: "{{.BASE_DIR}}/tf/.terraform"
+    cmds:
+      - TF_DATA_DIR={{.DATA_DIR}} terraform init -backend-config=path={{.BASE_DIR}}/tf/terraform.tfstate
+      - TF_DATA_DIR={{.DATA_DIR}} terraform plan -var-file={{.BASE_DIR}}/values.tfvars -out={{.BASE_DIR}}/tf/plan.tfplan -target=null_resource.ci_ilt -var="use_ci_ilt=true"
+      - TF_DATA_DIR={{.DATA_DIR}} terraform apply -auto-approve {{.BASE_DIR}}/tf/plan.tfplan 
+
+  terraform-launch-ci-ilt-day-two:
+    desc: Terraform commands for launching CI ILT Day Two
+    vars:
+      BASE_DIR: "environments/launch"
+      DATA_DIR: "{{.BASE_DIR}}/tf/.terraform"
+    cmds:
+      - TF_DATA_DIR={{.DATA_DIR}} terraform init -backend-config=path={{.BASE_DIR}}/tf/terraform.tfstate
+      - TF_DATA_DIR={{.DATA_DIR}} terraform plan -var-file={{.BASE_DIR}}/values.tfvars -out={{.BASE_DIR}}/tf/plan.tfplan -target=null_resource.ci_ilt_day_two -var="use_ci_ilt=true"
+      - TF_DATA_DIR={{.DATA_DIR}} terraform apply -auto-approve {{.BASE_DIR}}/tf/plan.tfplan 
+
+  terraform-launch-sto-ilt-day-one:
+    desc: Terraform commands for launching STO ILT Day One
+    vars:
+      BASE_DIR: "environments/launch"
+      DATA_DIR: "{{.BASE_DIR}}/tf/.terraform"
+    cmds:
+      - TF_DATA_DIR={{.DATA_DIR}} terraform init -backend-config=path={{.BASE_DIR}}/tf/terraform.tfstate
+      - TF_DATA_DIR={{.DATA_DIR}} terraform plan -var-file={{.BASE_DIR}}/values.tfvars -out={{.BASE_DIR}}/tf/plan.tfplan -target=null_resource.sto_ilt_day_one -var="use_sto_ilt=true"
+      - TF_DATA_DIR={{.DATA_DIR}} terraform apply -auto-approve {{.BASE_DIR}}/tf/plan.tfplan 
+
+  terraform-launch-sto-ilt-day-two:
+    desc: Terraform commands for launching STO ILT Day Two
+    vars:
+      BASE_DIR: "environments/launch"
+      DATA_DIR: "{{.BASE_DIR}}/tf/.terraform"
+    cmds:
+      - TF_DATA_DIR={{.DATA_DIR}} terraform init -backend-config=path={{.BASE_DIR}}/tf/terraform.tfstate
+      - TF_DATA_DIR={{.DATA_DIR}} terraform plan -var-file={{.BASE_DIR}}/values.tfvars -out={{.BASE_DIR}}/tf/plan.tfplan -target=null_resource.sto_ilt_day_two -var="use_sto_ilt=true"
+      - TF_DATA_DIR={{.DATA_DIR}} terraform apply -auto-approve {{.BASE_DIR}}/tf/plan.tfplan 
+
+  terraform-launch-cd-ilt-gitops-day-one:
+    desc: Terraform commands for launching CD ILT GitOps Day One
+    vars:
+      BASE_DIR: "environments/launch"
+      DATA_DIR: "{{.BASE_DIR}}/tf/.terraform"
+    cmds:
+      - TF_DATA_DIR={{.DATA_DIR}} terraform init -backend-config=path={{.BASE_DIR}}/tf/terraform.tfstate
+      - TF_DATA_DIR={{.DATA_DIR}} terraform plan -var-file={{.BASE_DIR}}/values.tfvars -out={{.BASE_DIR}}/tf/plan.tfplan -target=null_resource.cd_ilt_gitops_day_one -var="use_cd_ilt_gitops=true"
+      - TF_DATA_DIR={{.DATA_DIR}} terraform apply -auto-approve {{.BASE_DIR}}/tf/plan.tfplan 
+
+
+  terraform-admin-destroy:
+    desc: Terraform destroy for admin
+    vars:
+      BASE_DIR: "environments/admin"
+      DATA_DIR: "{{.BASE_DIR}}/tf/.terraform"
+    cmds:
+      - TF_DATA_DIR={{.DATA_DIR}} terraform destroy -auto-approve
+
+  terraform-student-destroy:
+    desc: Terraform destroy for student
+    vars:
+      BASE_DIR: "environments/student"
+      DATA_DIR: "{{.BASE_DIR}}/tf/.terraform"
+    cmds:
+      - TF_DATA_DIR={{.DATA_DIR}} terraform destroy -auto-approve
+
+  terraform-launch-destroy:
+    desc: Terraform destroy for launch
+    vars:
+      BASE_DIR: "environments/launch"
+      DATA_DIR: "{{.BASE_DIR}}/tf/.terraform"
+    cmds:
+      - TF_DATA_DIR={{.DATA_DIR}} terraform destroy -auto-approve
+
+  terraform-destroy-all:
+    desc: Terraform destroy all
+    cmds:
+    - task: terraform-launch-destroy
+    - task: terraform-student-destroy
+    - task: terraform-admin-destroy

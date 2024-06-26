@@ -1,0 +1,16 @@
+createNamespace: true
+namespace: mydevns
+name: mybackendservice
+replicas: 1
+image: /library/my-backend-service:v2.0.0
+servicetype: NodePort
+serviceport: 8080
+containerport: 8080
+nodeport: 30035
+mydomain: k3s-vm-sandbox.CHANGEME.instruqt.io
+activeprofile: dev
+env:
+  config:
+    HARNESS_BUILD: 1
+  secrets:
+    key2: value2

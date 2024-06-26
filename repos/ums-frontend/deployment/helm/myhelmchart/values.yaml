@@ -1,0 +1,15 @@
+createNamespace: true
+namespace: mydefaultns
+name: myfrontendservice
+replicas: 1
+image: /library/my-frontend-service:v7.0.0
+servicetype: NodePort
+serviceport: 3000
+containerport: 3000
+nodeport: 30055
+mydomain: k3s-vm-sandbox.CHANGEME.instruqt.io
+env:
+  config:
+    HARNESS_BUILD: 1
+  secrets:
+    key2: default

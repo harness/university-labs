@@ -1,0 +1,15 @@
+createNamespace: true
+namespace: <+infra.namespace>
+name: <+service.name>
+replicas: <+pipeline.variables.replicacount>
+image: <+artifact.image>
+servicetype: <+serviceVariables.servicetype>
+serviceport: <+serviceVariables.serviceport>
+containerport: <+serviceVariables.containerport>
+nodeport: <+serviceVariables.nodeport>
+mydomain: <+variable.mydomain>
+env:
+  config:
+    HARNESS_BUILD: <+pipeline.sequenceId>
+  secrets:
+    key2: value2

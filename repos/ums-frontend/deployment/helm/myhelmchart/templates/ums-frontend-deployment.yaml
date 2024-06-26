@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}-deployment
+  labels:
+    app: {{ .Values.name }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.name }}
+    spec:
+      containers:
+        - name: {{ .Values.name }}
+          image: harbor.{{ .Values.mydomain }}{{ .Values.image }}
+          imagePullPolicy: Always
+          # imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 500m
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 256Mi
+          ports:
+            - containerPort: {{ .Values.containerport }}
+          env:
+          - name: APPLICATION_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: {{ .Values.name }}-configmap
+                key: {{ .Values.name }}_APPLICATION_NAME

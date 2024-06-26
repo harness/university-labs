@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ums-frontend-configmap
+  namespace: ums-frontend-ns
+data:
+  ums-frontend_APPLICATION_NAME: ums-frontend

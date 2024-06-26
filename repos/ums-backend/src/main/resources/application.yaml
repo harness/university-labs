@@ -1,0 +1,60 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: "ums"
+  profiles:
+    active: "dev"
+  datasource:
+    url: jdbc:h2:mem:${spring.application.name}db
+    driverClassName: org.h2.Driver
+    username: sa
+    password: ''
+  h2:
+    console:
+      enabled: true
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    defer-datasource-initialization: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+  endpoint:
+    shutdown:
+      enabled: true
+    health:
+      probes:
+        enabled: true
+  info:
+    env:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+logging:
+  level:
+    com:
+      hvtest:
+        ums: DEBUG
+  pattern:
+    level: "%5p [${spring.application.name},%X{trace_id},%X{span_id}]"
+myapp:
+  env: ${spring.profiles.active}
+  harnessbuildversion: ${HARNESS_BUILD_VERSION:2.0.0}
+  harnessffsdkkey: ${HARNESS_FF_SDK_KEY:ff sdk key notset}
+  hostname: ${HOSTNAME:localhost}
+  javahome: ${JAVA_HOME:java_home not set}
+
+
+
+

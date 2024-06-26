@@ -1,0 +1,238 @@
+pipeline:
+  name: myonboardingpipeline
+  identifier: myonboardingpipeline
+  projectIdentifier: <+project.identifier>
+  orgIdentifier: <+org.identifier>
+  tags: {}
+  stages:
+    - stage:
+        name: mygitopssetup
+        identifier: mygitopssetup
+        description: ""
+        type: Custom
+        spec:
+          execution:
+            steps:
+              - parallel:
+                  - step:
+                      type: TerraformApply
+                      name: mygitopsinfraprod
+                      identifier: mygitopsinfraprod
+                      spec:
+                        provisionerIdentifier: mygitopsinfraprod
+                        configuration:
+                          type: Inline
+                          spec:
+                            configFiles:
+                              store:
+                                spec:
+                                  connectorRef: hcrtemp
+                                  repoName: my-terraform.git
+                                  gitFetchType: Branch
+                                  branch: main
+                                  folderPath: harness/gitops/gitopsinfra
+                                type: Git
+                            varFiles:
+                              - varFile:
+                                  type: Remote
+                                  identifier: mygitopsinfratfvar
+                                  spec:
+                                    store:
+                                      type: Git
+                                      spec:
+                                        gitFetchType: Branch
+                                        repoName: my-terraform.git
+                                        branch: main
+                                        paths:
+                                          - harness/gitops/gitopsinfra/prodterraform.tfvars
+                                        connectorRef: hcrtemp
+                        delegateSelectors:
+                          - myproddelegate
+                      timeout: 10m
+                  - step:
+                      type: TerraformApply
+                      name: mygitopsinfradev
+                      identifier: mygitopsinfradev
+                      spec:
+                        provisionerIdentifier: mygitopsinfradev
+                        configuration:
+                          type: Inline
+                          spec:
+                            configFiles:
+                              store:
+                                spec:
+                                  connectorRef: hcrtemp
+                                  repoName: my-terraform.git
+                                  gitFetchType: Branch
+                                  branch: main
+                                  folderPath: harness/gitops/gitopsinfra
+                                type: Git
+                            varFiles:
+                              - varFile:
+                                  type: Remote
+                                  identifier: mygitopsinfratfvar
+                                  spec:
+                                    store:
+                                      type: Git
+                                      spec:
+                                        gitFetchType: Branch
+                                        repoName: my-terraform.git
+                                        branch: main
+                                        paths:
+                                          - harness/gitops/gitopsinfra/devterraform.tfvars
+                                        connectorRef: hcrtemp
+                        delegateSelectors:
+                          - mydevdelegate
+                      timeout: 10m
+              - step:
+                  type: TerraformApply
+                  name: mygitopspipeline
+                  identifier: mygitopspipeline
+                  spec:
+                    provisionerIdentifier: mygitopspipeline
+                    configuration:
+                      type: Inline
+                      spec:
+                        configFiles:
+                          store:
+                            spec:
+                              connectorRef: hcrtemp
+                              repoName: my-terraform.git
+                              gitFetchType: Branch
+                              branch: main
+                              folderPath: harness/gitops/gitopspipeline
+                            type: Git
+                        varFiles:
+                          - varFile:
+                              type: Remote
+                              identifier: mygitopspipelinetfvar
+                              spec:
+                                store:
+                                  type: Git
+                                  spec:
+                                    gitFetchType: Branch
+                                    repoName: my-terraform.git
+                                    branch: main
+                                    paths:
+                                      - harness/gitops/gitopspipeline/terraform.tfvars
+                                    connectorRef: hcrtemp
+                    delegateSelectors:
+                      - myproddelegate
+                  timeout: 10m
+        tags: {}
+    - stage:
+        name: mygitopsdestroy
+        identifier: mygitopsdestroy
+        description: ""
+        type: Custom
+        spec:
+          execution:
+            steps:
+              - parallel:
+                  - step:
+                      type: TerraformDestroy
+                      name: mygitopsinfraprod
+                      identifier: mygitopsinfraprod
+                      spec:
+                        provisionerIdentifier: mygitopsinfraprod
+                        configuration:
+                          type: Inline
+                          spec:
+                            configFiles:
+                              store:
+                                spec:
+                                  connectorRef: hcrtemp
+                                  repoName: my-terraform.git
+                                  gitFetchType: Branch
+                                  branch: main
+                                  folderPath: harness/gitops/gitopsinfra
+                                type: Git
+                            varFiles:
+                              - varFile:
+                                  type: Remote
+                                  identifier: mygitopsinfratfvar
+                                  spec:
+                                    store:
+                                      type: Git
+                                      spec:
+                                        gitFetchType: Branch
+                                        repoName: my-terraform.git
+                                        branch: main
+                                        paths:
+                                          - harness/gitops/gitopsinfra/prodterraform.tfvars
+                                        connectorRef: hcrtemp
+                        delegateSelectors:
+                          - myproddelegate
+                      timeout: 10m
+                  - step:
+                      type: TerraformDestroy
+                      name: mygitopsinfradev
+                      identifier: mygitopsinfradev
+                      spec:
+                        provisionerIdentifier: mygitopsinfradev
+                        configuration:
+                          type: Inline
+                          spec:
+                            configFiles:
+                              store:
+                                spec:
+                                  connectorRef: hcrtemp
+                                  repoName: my-terraform.git
+                                  gitFetchType: Branch
+                                  branch: main
+                                  folderPath: harness/gitops/gitopsinfra
+                                type: Git
+                            varFiles:
+                              - varFile:
+                                  type: Remote
+                                  identifier: mygitopsinfratfvar
+                                  spec:
+                                    store:
+                                      type: Git
+                                      spec:
+                                        gitFetchType: Branch
+                                        repoName: my-terraform.git
+                                        branch: main
+                                        paths:
+                                          - harness/gitops/gitopsinfra/devterraform.tfvars
+                                        connectorRef: hcrtemp
+                        delegateSelectors:
+                          - mydevdelegate
+                      timeout: 10m
+              - step:
+                  type: TerraformDestroy
+                  name: mygitopspipeline
+                  identifier: mygitopspipeline
+                  spec:
+                    provisionerIdentifier: mygitopspipeline
+                    configuration:
+                      type: Inline
+                      spec:
+                        configFiles:
+                          store:
+                            spec:
+                              connectorRef: hcrtemp
+                              repoName: my-terraform.git
+                              gitFetchType: Branch
+                              branch: main
+                              folderPath: harness/gitops/gitopspipeline
+                            type: Git
+                        varFiles:
+                          - varFile:
+                              type: Remote
+                              identifier: mygitopspipelinetfvar
+                              spec:
+                                store:
+                                  type: Git
+                                  spec:
+                                    gitFetchType: Branch
+                                    repoName: my-terraform.git
+                                    branch: main
+                                    paths:
+                                      - harness/gitops/gitopspipeline/terraform.tfvars
+                                    connectorRef: hcrtemp
+                    delegateSelectors:
+                      - myproddelegate
+                  timeout: 10m
+        tags: {}
+  allowStageExecutions: true

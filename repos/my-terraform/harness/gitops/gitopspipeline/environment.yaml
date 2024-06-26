@@ -1,0 +1,7 @@
+environment:
+  name: ${environment_name}
+  identifier: ${environment_identifier}
+  projectIdentifier: ${project_identifier}
+  orgIdentifier: ${org_identifier}
+  tags: {}
+  type: ${env_type}

@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ums-deployment
+  labels:
+    app: ums
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ums
+  template:
+    metadata:
+      labels:
+        app: ums
+    spec:
+      containers:
+        - name: ums
+          image: docker.io/hvharness/ums:h7
+          imagePullPolicy: Always
+          # imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 500m
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 256Mi
+          ports:
+            - containerPort: 8080
+          env:
+          - name: SPRING_APPLICATION_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: ums-configmap
+                key: ums_APPLICATION_NAME
+          - name: SPRING_PROFILES_ACTIVE
+            valueFrom: 
+              configMapKeyRef:
+                name: ums-configmap
+                key: SPRING_PROFILES_ACTIVE
+          - name: SPRING_CONFIG_IMPORT
+            valueFrom: 
+              configMapKeyRef:
+                name: ums-configmap
+                key: SPRING_CONFIG_IMPORT
+          - name: SPRING.CLOUD.KUBERNETES.DISCOVERY.DISCOVERY-SERVER-URL
+            valueFrom: 
+              configMapKeyRef:
+                name: ums-configmap
+                key: SPRING.CLOUD.KUBERNETES.DISCOVERY.DISCOVERY-SERVER-URL
+          - name: JAVA_TOOL_OPTIONS
+            valueFrom: 
+              configMapKeyRef:
+                name: ums-configmap
+                key: JAVA_TOOL_OPTIONS
+          - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            valueFrom: 
+              configMapKeyRef:
+                name: ums-configmap
+                key: OTEL_EXPORTER_OTLP_ENDPOINT
+          - name: OTEL_METRICS_EXPORTER
+            valueFrom: 
+              configMapKeyRef:
+                name: ums-configmap
+                key: OTEL_METRICS_EXPORTER
+          - name: OTEL_SERVICE_NAME
+            value: ums

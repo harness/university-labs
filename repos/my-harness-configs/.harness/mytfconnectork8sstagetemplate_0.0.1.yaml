@@ -1,0 +1,105 @@
+template:
+  name: mytfconnectork8sstagetemplate
+  identifier: mytfconnectork8sstagetemplate
+  versionLabel: 0.0.1
+  type: Stage
+  projectIdentifier: CHANGEME
+  orgIdentifier: InstructorLedTraining
+  spec:
+    type: Custom
+    spec:
+      execution:
+        steps:
+          - step:
+              type: TerraformPlan
+              name: myplan
+              identifier: myplan
+              spec:
+                provisionerIdentifier: <+stage.variables.myprovisioneridentifier>
+                configuration:
+                  command: Apply
+                  configFiles:
+                    store:
+                      spec:
+                        connectorRef: <+input>
+                        repoName: my-terraform
+                        gitFetchType: Branch
+                        branch: main
+                        folderPath: harness/connectors/kubernetes/serviceaccount/
+                      type: Git
+                  varFiles:
+                    - varFile:
+                        spec:
+                          content: |-
+                            myharnessaccountid = "<+stage.variables.myharnessaccountid>"
+                            myk8ssaorgid = "<+stage.variables.myharnessorgid>"
+                            myk8ssaprojectid = "<+stage.variables.myharnessprojectid>"
+                            myharnessserviceaccesstoken = "<+stage.variables.mysatoken>"
+                            myk8ssaidentifier = "<+stage.variables.myk8ssa>"
+                            myk8ssaname = "<+stage.variables.myk8ssa>"
+                            myk8ssadescription = "<+stage.variables.myk8ssa>"
+                            myk8ssamasterurl = "<+stage.variables.myk8ssamasterurl>"
+                            myk8ssatoken = "<+stage.variables.myk8ssatoken>"
+                            myk8ssadelegateselector = "<+stage.variables.myk8ssadelegateselector>"
+                        identifier: mytfk8ssatfvars
+                        type: Inline
+                  secretManagerRef: harnessSecretManager
+                  exportTerraformPlanJson: false
+                  skipStateStorage: false
+                  exportTerraformHumanReadablePlan: true
+                  skipRefreshCommand: false
+              timeout: 10m
+              when:
+                stageStatus: Success
+          - step:
+              type: TerraformApply
+              name: myapply
+              identifier: myapply
+              spec:
+                provisionerIdentifier: <+stage.variables.myprovisioneridentifier>
+                configuration:
+                  type: InheritFromPlan
+              timeout: 10m
+              when:
+                stageStatus: Success
+    variables:
+      - name: myharnessaccountid
+        type: String
+        description: ""
+        required: true
+        value: <+account.identifier>
+      - name: myharnessorgid
+        type: String
+        description: ""
+        required: true
+        value: <+org.identifier>
+      - name: myharnessprojectid
+        type: String
+        description: ""
+        required: true
+        value: <+project.identifier>
+      - name: mysatoken
+        type: Secret
+        description: ""
+        required: true
+        value: <+input>
+      - name: myk8ssa
+        type: String
+        description: Provide a name for the kubernetes service account based connector
+        required: true
+        value: <+input>
+      - name: myk8ssamasterurl
+        type: String
+        description: Provide a master url for kubernetes cluster
+        required: true
+        value: <+input>
+      - name: myk8ssatoken
+        type: String
+        description: Provide a service account token that is stored as a secret in Harness
+        required: true
+        value: <+input>
+      - name: myk8ssadelegateselector
+        type: String
+        description: Provide a delegate name that will be used for connecting to the kubernetes cluster
+        required: true
+        value: <+input>

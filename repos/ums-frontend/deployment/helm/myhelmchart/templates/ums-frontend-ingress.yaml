@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.name }}-{{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.name }}-{{ .Values.namespace }}
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    cert-manager.io/cluster-issuer: production
+spec:
+  rules:
+    - host: {{ .Values.name }}-{{ .Values.namespace }}.{{ .Values.mydomain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.name }}
+                port:
+                  number: {{ .Values.serviceport }}
+  tls:
+    - hosts:
+        - {{ .Values.name }}-{{ .Values.namespace }}.{{ .Values.mydomain }}
+      secretName: {{ .Values.name }}-{{ .Values.namespace }}

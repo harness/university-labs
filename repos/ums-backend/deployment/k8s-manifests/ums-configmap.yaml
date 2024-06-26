@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ums-configmap
+data:
+  SPRING_PROFILES_ACTIVE: dev
+  SPRING_CONFIG_IMPORT: "optional:configserver:http://configserver:8071/"
+  SPRING.CLOUD.KUBERNETES.DISCOVERY.DISCOVERY-SERVER-URL: "http://spring-cloud-kubernetes-discoveryserver:80/"
+  CONFIGSERVER_APPLICATION_NAME: configserver
+  ums_APPLICATION_NAME: ums
+  GATEWAY_APPLICATION_NAME: gatewayserver
+  JAVA_TOOL_OPTIONS: "-javaagent:/app/libs/opentelemetry-javaagent-1.27.0.jar"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://tempo-grafana-tempo-distributor.observability.svc.cluster.local:4317"
+  OTEL_METRICS_EXPORTER: none

@@ -1,0 +1,47 @@
+pipeline:
+  identifier: autobasecipipeline
+  stages:
+    - stage:
+        identifier: mybuild
+        type: CI
+        spec:
+          execution:
+            steps:
+              - parallel:
+                  - step:
+                      identifier: docompilecode
+                      type: Run
+                      spec:
+                        command: mvn compile
+              - parallel:
+                  - step:
+                      identifier: dorununittest
+                      type: RunTests
+                      spec:
+                        args: test
+                        reports:
+                          type: JUnit
+                          spec:
+                            paths:
+                              - "**/*.xml"
+              - parallel:
+                  - step:
+                      identifier: dopmdchecks
+                      type: Run
+                      spec:
+                        command: |
+                          STAGEDIR=/root/myscan/staticcodeanalysis/pmd
+                          DOWNLOADURL=https://github.com/pmd/pmd/releases/download/pmd_releases%2F7.0.0/pmd-dist-7.0.0-bin.zip
+                          FILENAME=pmd.zip
+                          mkdir -p $${STAGEDIR}
+                          curl -s -L -o $${STAGEDIR}/$${FILENAME} $${DOWNLOADURL}
+                          unzip $${STAGEDIR}/$${FILENAME} -d $${STAGEDIR}
+                          $${STAGEDIR}/pmd-bin-7.0.0/bin/pmd check -d /harness/ -R rulesets/java/quickstart.xml -f xml -r pmdreport.xml --no-progress --no-fail-on-violation
+                          cat pmdreport.xml
+  properties:
+    ci:
+      codebase:
+        build:
+          type: branch
+          spec:
+            branch: myfeature2branch
