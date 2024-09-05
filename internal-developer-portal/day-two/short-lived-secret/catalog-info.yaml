@@ -1,0 +1,71 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: react-app-short-lived
+  title: Create React App (IDP-Stage, Short-lived Secret)
+  description: A template to create a new react app with short-lived dev creds.
+  tags:
+    - nextjs
+    - react
+    - javascript
+spec:
+  owner: engineering
+  type: service
+  parameters:
+    - title: Next.js app details
+      required:
+        - project_name
+        - github_repo
+      properties:
+        project_name:
+          title: Name of your new service
+          type: string
+          description: Unique app name (no spaces)
+        github_repo:
+          title: Name of the GitHub repository
+          type: string
+          description: This will be the name of Repository on Github
+    - title: Details
+      properties:
+        secretValue:
+          title: Your credentials
+          type: string
+          ui:widget: password
+        # This field is hidden but needed to authenticate the request to trigger the pipeline
+        token:
+          title: Harness Token
+          type: string
+          ui:widget: password
+          ui:field: HarnessAuthToken
+  steps:
+    - id: createsecret
+      name: Create Harness secret
+      action: harness:create-secret
+      input:
+        projectId: ${{ parameters.project_id }}
+        orgId: "default"
+        secretValue: ${{ parameters.secretValue }}
+        apikey: ${{ parameters.token }}
+    - id: trigger
+      name: Creating your new service
+      action: trigger:harness-custom-pipeline
+      input:
+        url: "< Pipeline URL here>"
+        inputset:
+          project_name: ${{ parameters.project_name }}
+          github_repo: ${{ parameters.github_repo }}
+          secret: ${{ steps.createsecret.output.secretId }}
+        apikey: ${{ parameters.token }}
+    - id: deletesecret
+      name: Delete the Harness secret
+      action: harness:delete-secret
+      input:
+        projectId: ${{ parameters.project_id }}
+        orgId: "default"
+        secretId: ${{ steps.createsecret.output.secretId }}
+        apikey: ${{ parameters.token }}
+
+  output:
+    links:
+      - title: Pipeline Details
+        url: ${{ steps.trigger.output.PipelineUrl }}

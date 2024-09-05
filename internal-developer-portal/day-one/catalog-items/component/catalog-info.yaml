@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: Change-Me
+  description: Manually created Component
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: service
+  owner: engineering
+  system: e-commerce-platform
+  lifecycle: experimental

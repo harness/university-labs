@@ -1,0 +1,27 @@
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: engineering
+  description: The engineering team responsible for building and maintaining our products.
+  tags:
+    - engineering
+    - product-development
+spec:
+  type: team
+  profile:
+    displayName: Engineering Team
+    email: engineering@example.com
+    picture: https://example.com/team-picture.png
+  members:
+    - user:john.doe
+    - user:jane.smith
+  parent: department:technology
+  children:
+    - group:frontend
+    - group:backend
+    - group:devops
+  links:
+    - url: https://engineering.example.com
+      title: Engineering Wiki
+    - url: https://github.com/organization/engineering
+      title: GitHub
