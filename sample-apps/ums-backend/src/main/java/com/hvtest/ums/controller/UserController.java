@@ -88,7 +88,7 @@ public class UserController {
         configInfo.put("port", port);
         configInfo.put("osArch", osArch);
         configInfo.put("osVersion", osVersion);
-        configInfo.put("myF1Msg1", "Hello Worldz!!");
+        configInfo.put("myF1Msg1", "Hello Worldzz!!");
 
         return ResponseEntity
                 .status(HttpStatus.OK)
