@@ -3,6 +3,8 @@ kind: Component
 metadata:
   name: Change-Me
   description: Manually created Component
+  tags:
+    - Change-Me
   annotations:
     backstage.io/techdocs-ref: dir:.
 spec:
