@@ -1,0 +1,8 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: e-commerce-platform
+  namespace: default
+  description: "The e-commerce platform system"
+spec:
+  owner: engineering
