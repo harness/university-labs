@@ -5,25 +5,6 @@ metadata:
   description: harness_guestbook
   tags:
     - harness-guestbook
-  links:
-   - url: https://harness.io/
-     title: Examples Users
-     icon: user
-   - url: https://harness.io/
-     title: Example Group
-     icon: group
-   - url: https://harness.io/
-     title: Dashboard
-     icon: dashboard
-   - url: https://harness.io/
-     title: Support
-     icon: help
-   - url: https://harness.io/
-     title: Website
-     icon: web
-   - url: https://harness.io/
-     title: Alerts
-     icon: alert  
   annotations:
       backstage.io/techdocs-ref: dir:.
 spec:
