@@ -20,7 +20,7 @@ spec:
           title: Name of your new service
           type: string
           description: Unique app name (no spaces)
-    - title: Service Infrastructure Details
+    - title: Service Owner Details
       required:
         - owner
       properties:
