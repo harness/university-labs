@@ -131,13 +131,6 @@ pipeline:
                   spec:
                     skipDryRun: false
                     pruningEnabled: false
-              - step:
-                  type: Chaos
-                  name: delete_pod
-                  identifier: delete_pod
-                  spec:
-                    experimentRef: 8c2c871a-25b9-4a52-b85f-0a5ccb055254
-                    expectedResilienceScore: 50
             rollbackSteps:
               - step:
                   name: Rollback Rollout Deployment

@@ -1,0 +1,23 @@
+service:
+  name: ${service_identifier}
+  identifier: ${service_identifier}
+  orgIdentifier: ${org_identifier}
+  projectIdentifier: ${project_identifier}
+  serviceDefinition:
+    spec:
+      manifests:
+        - manifest:
+            identifier: base_manifest
+            type: K8sManifest
+            spec:
+              store:
+                type: HarnessCode
+                spec:
+                  gitFetchType: Branch
+                  paths:
+                    - infra/
+                  repoName: my-backend-service
+                  branch: main
+              skipResourceVersioning: false
+              enableDeclarativeRollback: false
+    type: Kubernetes

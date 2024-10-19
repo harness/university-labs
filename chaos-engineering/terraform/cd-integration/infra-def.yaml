@@ -1,0 +1,13 @@
+infrastructureDefinition:
+  name: ${infra_name}
+  identifier: ${infra_identifier}
+  orgIdentifier: ${org_identifier}
+  projectIdentifier: ${project_identifier}
+  environmentRef: ${env_identifier}
+  deploymentType: Kubernetes
+  type: KubernetesDirect
+  spec:
+    connectorRef: myk8sclusterconnector
+    namespace: ${namespace}
+    releaseName: release-<+INFRA_KEY_SHORT_ID>
+  allowSimultaneousDeployments: false
