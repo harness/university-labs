@@ -106,7 +106,7 @@ resource "harness_platform_infrastructure" "infra_prod" {
     project_identifier  = var.project_id
     infra_name          = "prod_infra"
     infra_identifier    = "prod_infra"
-    env_identifier      = harness_platform_environment.env_dev.id
+    env_identifier      = harness_platform_environment.env_prod.id
     namespace           = "prod"
   })
 }
