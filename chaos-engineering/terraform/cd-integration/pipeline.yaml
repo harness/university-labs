@@ -18,7 +18,7 @@ pipeline:
             environmentRef: dev
             deployToAll: false
             infrastructureDefinitions:
-              - identifier: devcluster
+              - identifier: dev_infra
           execution:
             steps:
               - step:
@@ -57,7 +57,7 @@ pipeline:
             environmentRef: qa
             deployToAll: false
             infrastructureDefinitions:
-              - identifier: qacluster
+              - identifier: qa_infra
           execution:
             steps:
               - step:
@@ -120,7 +120,7 @@ pipeline:
             environmentRef: prod
             deployToAll: false
             infrastructureDefinitions:
-              - identifier: prodcluster
+              - identifier: prod_infra
           execution:
             steps:
               - step:

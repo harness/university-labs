@@ -106,7 +106,7 @@ resource "harness_platform_infrastructure" "infra_prod" {
     project_identifier  = var.project_id
     infra_name          = "prod_infra"
     infra_identifier    = "prod_infra"
-    env_identifier      = harness_platform_environment.env_qa.id
+    env_identifier      = harness_platform_environment.env_dev.id
     namespace           = "prod"
   })
 }
@@ -129,15 +129,15 @@ output "pipeline_id" {
 }
 
 output "environment_dev" {
-  value       = harness_platform_environment.env_dev
+  value       = harness_platform_environment.env_dev.id
 }
 
 output "environment_qa" {
-  value       = harness_platform_environment.env_qa
+  value       = harness_platform_environment.env_qa.id
 }
 
 output "environment_prod" {
-  value       = harness_platform_environment.env_prod
+  value       = harness_platform_environment.env_prod.id
 }
 
 output "service_identifier" {
