@@ -1,0 +1,26 @@
+service:
+  name: ${service_identifier}
+  identifier: ${service_identifier}
+  orgIdentifier: ${org_identifier}
+  projectIdentifier: ${project_identifier}
+  serviceDefinition:
+    spec:
+      manifests:
+        - manifest:
+            identifier: guestbook
+            type: K8sManifest
+            spec:
+              store:
+                type: HarnessCode
+                spec:
+                  gitFetchType: Branch
+                  paths:
+                    - day-two/guestbook/guestbook-ui-deployment.yaml
+                    - day-two/guestbook/guestbook-ui-svc.yaml
+                  repoName: idp
+                  branch: main
+              skipResourceVersioning: false
+              enableDeclarativeRollback: false
+    type: Kubernetes
+  tags:
+    svc-${project_identifier}: ""
