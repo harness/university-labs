@@ -46,7 +46,7 @@ resource "harness_platform_infrastructure" "harness_k8sinfra" {
   name            = "harness_k8sinfra"
   org_id          = var.org_id
   project_id      = var.project_id
-  env_id          = harness_platform_environment.env_dev.id
+  env_id          = harness_platform_environment.harnessdevenv.id
   type            = "KubernetesDirect"
   deployment_type = "Kubernetes"
   yaml            = templatefile("infra-def.yaml", {
@@ -54,7 +54,7 @@ resource "harness_platform_infrastructure" "harness_k8sinfra" {
     project_identifier  = var.project_id
     infra_name          = "harness_k8sinfra"
     infra_identifier    = "harness_k8sinfra"
-    env_identifier      = harness_platform_environment.env_dev.id
+    env_identifier      = harness_platform_environment.harnessdevenv.id
     namespace           = "default"
   })
 }
