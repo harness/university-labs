@@ -60,8 +60,8 @@ resource "harness_platform_infrastructure" "harness_k8sinfra" {
 }
 
 resource "harness_platform_service" "svc_guestbook" {
-  identifier  = "guestbook"
-  name        = "guestbook"
+  identifier  = "svc_guestbook_${project_identifier}"
+  name        = "svc_guestbook_${project_identifier}"
   description = "Guestbook web app"
   org_id      = var.org_id
   project_id  = var.project_id
