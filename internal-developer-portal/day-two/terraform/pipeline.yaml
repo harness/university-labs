@@ -45,4 +45,4 @@ pipeline:
               action:
                 type: StageRollback
         delegateSelectors:
-          - ${project_identifier}-delegate
+          - ${project_identifier}mydelegateilt
