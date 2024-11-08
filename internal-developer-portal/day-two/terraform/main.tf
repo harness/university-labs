@@ -12,6 +12,7 @@ variable "org_id" {}
 variable "project_id" {}
 variable "pat" {}
 variable "refpipeline" {}
+variable "service_name" {}
 
 provider "harness" {
     endpoint            = "https://app.harness.io/gateway"
@@ -29,6 +30,7 @@ resource "harness_platform_pipeline" "guestbook_rolling_pipeline" {
     project_identifier  = var.project_id
     pipeline_name       = var.refpipeline
     pipeline_identifier = var.refpipeline
+    service_name        = var.service_name
   })
 }
 
@@ -60,15 +62,15 @@ resource "harness_platform_infrastructure" "harness_k8sinfra" {
 }
 
 resource "harness_platform_service" "svc_guestbook" {
-  identifier  = "svc_guestbook_${project_identifier}"
-  name        = "svc_guestbook_${project_identifier}"
+  identifier  = var.service_name
+  name        = var.service_name
   description = "Guestbook web app"
   org_id      = var.org_id
   project_id  = var.project_id
   yaml        = templatefile("service.yaml", {
     org_identifier      = var.org_id
     project_identifier  = var.project_id
-    service_identifier  = "guestbook"
+    service_identifier  = var.service_name
   })
 }
 
