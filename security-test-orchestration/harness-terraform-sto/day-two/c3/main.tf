@@ -32,6 +32,7 @@ resource "harness_platform_pipeline" "autopipeline1" {
     project_identifier = var.project_id
     pipeline_identifier = var.refpipeline1
     container_registry_link = var.container_registry_link
+    pipeline_name = "autostopipeline"
   })
 }
 
@@ -45,6 +46,7 @@ resource "harness_platform_pipeline" "autopipeline2" {
     project_identifier = var.project_id
     pipeline_identifier = var.refpipeline2
     container_registry_link = var.container_registry_link
+    pipeline_name = "autostocustomscannerpipeline"
   })
 }
 
