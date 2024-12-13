@@ -99,7 +99,7 @@ pipeline:
                             identifier: StatusCheck
                             spec:
                               connectorRef: mycontainerregistryconnector
-                              image: ${container_registry_link}/harness/sto-plugin:1.33.0
+                              image: ${container_registry_link}/harness/sto-plugin:1.50.0
                               shell: Bash
                               command: |-
                                 apt-get -y update > /dev/null
