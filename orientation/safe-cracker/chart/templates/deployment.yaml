@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: safe-cracker
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: safe-cracker
+  template:
+    metadata:
+      labels:
+        app: safe-cracker
+    spec:
+      containers:
+        - name: safe-cracker
+          image: "{{ .Values.image.repo }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: 3000

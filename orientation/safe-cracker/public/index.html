@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Safe Cracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="terminal">
+    <h1>Safe Cracker</h1>
+    <p class="instructions">Get 5 codes correct to open the safe</p>
+
+    <img id="safe-img" src="safe-closed.png" alt="Safe" />
+
+    <div class="progress-container">
+      <div id="progress-bar"></div>
+    </div>
+
+    <p id="target-text"></p>
+    <input type="text" id="user-input" autocomplete="off" autofocus />
+    <p id="feedback"></p>
+    <p>Score: <span id="score">0</span></p>
+
+    <div class="controls">
+      <button onclick="toggleMute()">🔈 Mute/Unmute</button>
+      <button onclick="adjustVolume()">🔊 Volume</button>
+      <button id="reset-btn" onclick="resetGame()" style="display:none;">🔁 Reset</button>
+    </div>
+  </div>
+
+  <!-- Sound Effects -->
+  <audio id="type-sound" src="type.wav" preload="auto"></audio>
+  <audio id="success-sound" src="success.wav" preload="auto"></audio>
+  <audio id="fail-sound" src="fail.wav" preload="auto"></audio>
+
+  <script src="safe-cracker.js"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+body {
+  background-color: black;
+  color: #00ff00;
+  font-family: 'Courier New', Courier, monospace;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+}
+
+#terminal {
+  width: 600px;
+  padding: 20px;
+  border: 2px solid #00ff00;
+  box-shadow: 0 0 10px #00ff00;
+  text-align: center;
+}
+
+.instructions {
+  font-style: italic;
+  color: #0f0;
+}
+
+#safe-img {
+  width: 200px;
+  margin: 10px 0;
+}
+
+input {
+  background-color: black;
+  color: #00ff00;
+  border: none;
+  border-bottom: 1px solid #00ff00;
+  width: 100%;
+  font-size: 20px;
+  padding: 10px;
+}
+
+#feedback {
+  margin-top: 10px;
+  font-weight: bold;
+}
+
+.controls {
+  margin-top: 10px;
+}
+
+.progress-container {
+  background-color: #003300;
+  border: 1px solid #00ff00;
+  width: 100%;
+  height: 20px;
+  margin: 10px 0;
+  position: relative;
+}
+
+#progress-bar {
+  height: 100%;
+  background-color: #00ff00;
+  width: 0%;
+  transition: width 0.3s ease-in-out;
+}
