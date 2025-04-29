@@ -4,16 +4,16 @@ FROM node:18-alpine
 # Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json first
-COPY package*.json ./
+# Copy the safe-cracker app directory contents
+COPY orientation/safe-cracker/package*.json ./
 
 # Install app dependencies
 RUN npm install
 
-# Copy the rest of the app source code
-COPY . .
+# Copy the rest of the app source
+COPY orientation/safe-cracker/ .
 
-# Build the application
+# Build the app
 RUN npm run build
 
 # Expose application port (adjust if needed)
