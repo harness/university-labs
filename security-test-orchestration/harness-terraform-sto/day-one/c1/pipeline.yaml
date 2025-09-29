@@ -42,6 +42,8 @@ pipeline:
                         advanced:
                           log:
                             level: info
+                          args:
+                            cli: "--disableOssIndex"
                         config: default
                         mode: orchestration
                         target:
